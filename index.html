@@ -117,6 +117,11 @@ body{background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI'
 .poly-wrap{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer}
 .poly-wrap input{accent-color:var(--accent2);width:13px;height:13px;cursor:pointer}
 .day-result{font-size:10px;color:var(--accent2);margin-top:4px;min-height:13px}
+.chantier-row{display:flex;align-items:center;gap:6px;margin-top:6px}
+.chantier-lbl{font-size:10px;color:var(--muted);white-space:nowrap}
+.chantier-input{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:6px 8px;font-size:12px;font-family:inherit}
+.chantier-input:focus{outline:none;border-color:var(--accent)}
+.chantier-input::placeholder{color:var(--muted)}
 .spacer{height:24px}
 
 @media print {
@@ -603,6 +608,7 @@ function renderPage(){
             <button class="igd-btn${d.igd==='igd2'?' sel':''}" data-dk="${dk}" data-igd="igd2">IGD2 41€</button>
             <label class="poly-wrap"><input type="checkbox" data-dk="${dk}" data-f="poly"${d.poly?' checked':''}> Polycompétence +4€</label>
           </div>
+          <div class="chantier-row"><span class="chantier-lbl">🏗 Chantier</span><input type="text" class="chantier-input" data-dk="${dk}" data-f="chantier" placeholder="Nom du chantier…" value="${d.chantier||''}"></div>
           <div class="day-result" id="dr-${dk}">${resText}</div>
         </div>
       </div>`;
@@ -673,6 +679,12 @@ function bindEvents(){
     document.getElementById(`row-${dk}`).classList.toggle('disabled',dis);
     document.getElementById(`body-${dk}`).style.display=dis?'none':'';
     updateDayResult(dk);updateWeekFromDay(dk);updateSummaryBar();
+  }));
+  document.querySelectorAll('.chantier-input').forEach(inp=>inp.addEventListener('change',e=>{
+    const dk=e.target.dataset.dk;
+    if(!ST.dayData[dk])ST.dayData[dk]={};
+    ST.dayData[dk].chantier=e.target.value;
+    save();
   }));
   document.getElementById('salaryInput').addEventListener('change',e=>{
     ST.salaire=parseFloat(e.target.value)||1850;save();updateSummaryBar();
