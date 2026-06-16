@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Suivi Heures</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg:#0d0f18;--surface:#161928;--card:#1e2235;--border:#2a2f4a;
+  --accent:#5b8ff9;--accent2:#f7b84f;--green:#3ecf8e;--red:#f05252;
+  --purple:#c084fc;--text:#e4e8f5;--muted:#7580a8;--radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',sans-serif;min-height:100vh;font-size:14px}
+
+/* AUTH */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.auth-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px 24px;width:100%;max-width:360px}
+.auth-logo{text-align:center;font-size:28px;margin-bottom:6px}
+.auth-title{text-align:center;font-size:18px;font-weight:800;color:var(--accent);margin-bottom:4px}
+.auth-sub{text-align:center;font-size:12px;color:var(--muted);margin-bottom:24px}
+.auth-tabs{display:flex;gap:0;margin-bottom:20px;background:var(--card);border-radius:8px;padding:3px}
+.auth-tab{flex:1;padding:8px;text-align:center;font-size:13px;font-weight:600;color:var(--muted);border:none;background:none;border-radius:6px;cursor:pointer;transition:all .2s}
+.auth-tab.active{background:var(--accent);color:#fff}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:600}
+.field input{width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:11px 12px;font-size:14px;font-family:inherit;transition:border .2s}
+.field input:focus{outline:none;border-color:var(--accent)}
+.btn-auth{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;transition:opacity .2s}
+.btn-auth:active{opacity:.8}
+.btn-auth:disabled{opacity:.5;cursor:not-allowed}
+.auth-msg{text-align:center;font-size:12px;margin-top:12px;min-height:18px}
+.auth-msg.err{color:var(--red)}
+.auth-msg.ok{color:var(--green)}
+
+/* APP */
+.app-wrap{display:none}
+.hdr{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;gap:8px}
+.hdr-left{display:flex;align-items:center;gap:8px}
+.hdr-title{font-size:15px;font-weight:700;color:var(--accent);flex-shrink:0}
+.hdr-user{font-size:10px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hdr-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.inp-grp{display:flex;align-items:center;gap:4px}
+.inp-grp label{font-size:10px;color:var(--muted);white-space:nowrap}
+.inp-grp input{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:5px 7px;font-size:12px;text-align:right;font-family:inherit}
+.inp-grp input.w-sal{width:78px}
+.inp-grp input.w-taux{width:52px}
+.inp-grp span{font-size:11px;color:var(--muted)}
+.btn-logout{padding:5px 10px;background:var(--card);border:1px solid var(--border);border-radius:7px;color:var(--red);font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap}
+
+.sync-bar{background:var(--surface);border-bottom:1px solid var(--border);text-align:center;padding:4px;font-size:10px;color:var(--muted);min-height:24px}
+.sync-bar.saving{color:var(--accent2)}
+.sync-bar.saved{color:var(--green)}
+.sync-bar.err{color:var(--red)}
+
+.tabs-bar{background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabs-bar::-webkit-scrollbar{display:none}
+.tabs{display:flex;padding:0 6px;min-width:max-content}
+.tab{padding:9px 13px;font-size:12px;font-weight:600;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:color .15s}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+.pbar{background:var(--surface);border-bottom:1px solid var(--border);text-align:center;padding:5px;font-size:10px;color:var(--muted)}
+.pbar strong{color:var(--accent2)}
+
+.summary{margin:10px 10px 6px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px}
+.sum-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.sum-box{text-align:center}
+.sum-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.sum-val{font-size:15px;font-weight:800}
+.sum-val.net{color:var(--green)}.sum-val.prem{color:var(--accent2)}.sum-val.tot{color:var(--accent)}
+.sum-detail{margin-top:6px;font-size:10px;color:var(--muted);text-align:center;line-height:1.5}
+.sum-detail span{color:var(--text)}
+.sum-note{margin-top:6px;font-size:9px;color:var(--muted);text-align:center}
+
+.export-wrap{margin:0 10px 8px}
+.export-btn{width:100%;padding:9px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;text-align:center;display:block}
+
+.week-block{margin:0 10px 10px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.week-hdr{background:var(--surface);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.week-title{font-size:12px;font-weight:700;color:var(--accent)}
+.week-htotal{font-size:11px;color:var(--muted)}
+.mod-bar{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--border)}
+.mod-item{padding:6px 0;text-align:center}
+.mod-item:not(:last-child){border-right:1px solid var(--border)}
+.mod-num{font-size:13px;font-weight:700}
+.mod-num.pos{color:var(--green)}.mod-num.warn{color:var(--accent2)}.mod-num.zero{color:var(--muted)}
+.mod-lbl{font-size:9px;color:var(--muted);margin-top:1px}
+.week-end{padding:8px 12px;background:var(--bg);border-top:1px solid var(--border)}
+.we-lbl{font-size:10px;color:var(--muted);font-weight:600;margin-bottom:6px}
+.we-groups{display:flex;gap:8px;flex-wrap:wrap}
+.we-group{display:flex;gap:4px}
+.we-btn{padding:4px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-size:11px;cursor:pointer;transition:all .15s}
+.we-btn.sel-pe{background:rgba(91,143,249,.15);border-color:var(--accent);color:var(--accent);font-weight:700}
+.we-btn.sel-vp{background:rgba(62,207,142,.15);border-color:var(--green);color:var(--green);font-weight:700}
+
+.day-row{border-bottom:1px solid var(--border);padding:8px 12px;transition:opacity .2s}
+.day-row.disabled{opacity:.35}
+.day-row:last-of-type{border-bottom:none}
+.day-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.day-name{font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px}
+.day-name.sun{color:var(--red)}.day-name.hol{color:var(--purple)}.day-name.sat{color:var(--accent2)}
+.badge{font-size:9px;padding:1px 5px;border-radius:4px;font-weight:600}
+.badge-hol{background:rgba(192,132,252,.15);color:var(--purple)}
+.day-toggle{width:36px;height:20px;border-radius:10px;background:var(--green);border:none;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
+.day-toggle::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .2s}
+.day-toggle.off{background:var(--border)}
+.day-toggle.off::after{transform:translateX(16px)}
+.inputs-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.t-group{display:flex;align-items:center;gap:4px}
+.t-lbl{font-size:10px;color:var(--muted)}
+.t-input{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:6px 8px;width:75px;font-size:13px;text-align:center;font-family:inherit}
+.t-input:focus{outline:none;border-color:var(--accent)}
+.opts-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.igd-btn{padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-size:11px;cursor:pointer;transition:all .15s}
+.igd-btn.sel{background:rgba(91,143,249,.15);border-color:var(--accent);color:var(--accent);font-weight:700}
+.poly-wrap{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer}
+.poly-wrap input{accent-color:var(--accent2);width:13px;height:13px;cursor:pointer}
+.day-result{font-size:10px;color:var(--accent2);margin-top:4px;min-height:13px}
+.spacer{height:24px}
+
+@media print {
+  body{background:#fff;color:#000;font-size:11px}
+  .hdr,.tabs-bar,.pbar,.export-wrap,.day-toggle,.opts-row,.mod-bar,.week-end,.sync-bar,.auth-wrap{display:none!important}
+  .app-wrap{display:block!important}
+  .summary{border:1px solid #ccc;border-radius:4px;margin:8px 0}
+  .sum-val.net,.sum-val.prem,.sum-val.tot,.sum-detail span{color:#000}
+  .sum-note,.sum-lbl,.sum-detail{color:#555}
+  .week-block{border:1px solid #ccc;border-radius:4px;margin:8px 0;break-inside:avoid}
+  .week-hdr{background:#f0f0f0}
+  .week-title,.week-htotal{color:#000}
+  .day-row{border-bottom:1px solid #eee}
+  .day-row.disabled{display:none}
+  .day-name,.day-name.sun,.day-name.hol,.day-name.sat{color:#000}
+  .t-input{border:1px solid #ccc;background:#fff;color:#000}
+  .day-result{color:#555}
+  .print-header{display:block!important}
+}
+.print-header{display:none;text-align:center;margin-bottom:12px}
+.print-header h2{font-size:16px;font-weight:700}
+.print-header p{font-size:11px;color:#555;margin-top:4px}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div class="auth-wrap" id="authWrap">
+  <div class="auth-box">
+    <div class="auth-logo">⏱</div>
+    <div class="auth-title">Suivi Heures</div>
+    <div class="auth-sub">Connecte-toi pour accéder à tes données</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabLogin" onclick="switchTab('login')">Connexion</button>
+      <button class="auth-tab" id="tabRegister" onclick="switchTab('register')">Inscription</button>
+    </div>
+    <div class="field"><label>Email</label><input type="email" id="authEmail" placeholder="ton@email.com" autocomplete="email"></div>
+    <div class="field"><label>Mot de passe</label><input type="password" id="authPass" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="btn-auth" id="authBtn" onclick="doAuth()">Se connecter</button>
+    <div class="auth-msg" id="authMsg"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app-wrap" id="appWrap">
+  <div class="hdr">
+    <div class="hdr-left">
+      <div class="hdr-title">⏱ Suivi Heures</div>
+      <div class="hdr-user" id="hdrUser"></div>
+    </div>
+    <div class="hdr-right">
+      <div class="inp-grp">
+        <label>Brut</label>
+        <input type="number" id="salaryInput" class="w-sal" value="1850" min="0" step="10">
+        <span>€</span>
+      </div>
+      <div class="inp-grp">
+        <label>Taux</label>
+        <input type="number" id="tauxNetInput" class="w-taux" value="75.8" min="50" max="95" step="0.1">
+        <span>%</span>
+      </div>
+      <button class="btn-logout" onclick="doLogout()">⏏ Quitter</button>
+    </div>
+  </div>
+  <div class="sync-bar" id="syncBar">Chargement…</div>
+  <div class="tabs-bar"><div class="tabs" id="tabsEl"></div></div>
+  <div class="pbar" id="periodBar"></div>
+  <div id="root"></div>
+  <div class="spacer"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// SUPABASE
+// ═══════════════════════════════════════
+const SUPA_URL = 'https://vfffthzmhnkwdsagsbbr.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmZmZ0aHptaG5rd2RzYWdzYmJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1NTk2MDMsImV4cCI6MjA5NzEzNTYwM30.JZWUMiBnWx6kyQhHtBDvTRyRQo1zuQV2gh24OxdrENI';
+const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+let currentUser = null;
+let saveTimer = null;
+
+// ═══════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════
+let authMode = 'login';
+function switchTab(mode) {
+  authMode = mode;
+  document.getElementById('tabLogin').classList.toggle('active', mode==='login');
+  document.getElementById('tabRegister').classList.toggle('active', mode==='register');
+  document.getElementById('authBtn').textContent = mode==='login' ? 'Se connecter' : "S'inscrire";
+  document.getElementById('authMsg').textContent = '';
+}
+
+async function doAuth() {
+  const email = document.getElementById('authEmail').value.trim();
+  const pass  = document.getElementById('authPass').value;
+  const btn   = document.getElementById('authBtn');
+  const msg   = document.getElementById('authMsg');
+  if (!email || !pass) { showMsg('Remplis tous les champs', 'err'); return; }
+  btn.disabled = true;
+  btn.textContent = '…';
+  let result;
+  if (authMode === 'login') {
+    result = await supa.auth.signInWithPassword({ email, password: pass });
+  } else {
+    result = await supa.auth.signUp({ email, password: pass });
+  }
+  btn.disabled = false;
+  btn.textContent = authMode==='login' ? 'Se connecter' : "S'inscrire";
+  if (result.error) {
+    showMsg(friendlyError(result.error.message), 'err');
+  } else if (authMode==='register' && !result.data.session) {
+    showMsg('Vérifie ton email pour confirmer ton compte', 'ok');
+  } else {
+    showMsg('', '');
+  }
+}
+
+function friendlyError(msg) {
+  if (msg.includes('Invalid login')) return 'Email ou mot de passe incorrect';
+  if (msg.includes('already registered')) return 'Cet email est déjà utilisé';
+  if (msg.includes('Password should')) return 'Mot de passe trop court (6 min)';
+  if (msg.includes('valid email')) return 'Email invalide';
+  return msg;
+}
+
+function showMsg(txt, type) {
+  const el = document.getElementById('authMsg');
+  el.textContent = txt;
+  el.className = 'auth-msg' + (type ? ' '+type : '');
+}
+
+// Écoute les changements de session
+supa.auth.onAuthStateChange((event, session) => {
+  if (session) {
+    currentUser = session.user;
+    document.getElementById('authWrap').style.display = 'none';
+    document.getElementById('appWrap').style.display = 'block';
+    document.getElementById('hdrUser').textContent = currentUser.email;
+    loadUserData();
+  } else {
+    currentUser = null;
+    document.getElementById('authWrap').style.display = 'flex';
+    document.getElementById('appWrap').style.display = 'none';
+  }
+});
+
+async function doLogout() {
+  await supa.auth.signOut();
+}
+
+// ═══════════════════════════════════════
+// SAVE / LOAD SUPABASE
+// ═══════════════════════════════════════
+function setSyncBar(state, txt) {
+  const el = document.getElementById('syncBar');
+  el.className = 'sync-bar' + (state ? ' '+state : '');
+  el.textContent = txt;
+}
+
+async function loadUserData() {
+  setSyncBar('', 'Chargement…');
+  const { data, error } = await supa
+    .from('user_data')
+    .select('data')
+    .eq('user_id', currentUser.id)
+    .single();
+  if (error && error.code !== 'PGRST116') {
+    setSyncBar('err', 'Erreur de chargement');
+    initApp({});
+    return;
+  }
+  const saved = data?.data || {};
+  initApp(saved);
+  setSyncBar('saved', '✓ Données chargées');
+}
+
+function scheduleSave() {
+  setSyncBar('saving', 'Sauvegarde…');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveUserData, 1500);
+}
+
+async function saveUserData() {
+  if (!currentUser) return;
+  const payload = {
+    user_id: currentUser.id,
+    data: {
+      salaire: ST.salaire,
+      tauxNet: ST.tauxNet,
+      periodIdx: ST.periodIdx,
+      dayData: ST.dayData,
+      weekEndChoices: ST.weekEndChoices,
+      disabled: ST.disabled
+    },
+    updated_at: new Date().toISOString()
+  };
+  const { error } = await supa
+    .from('user_data')
+    .upsert(payload, { onConflict: 'user_id' });
+  if (error) {
+    setSyncBar('err', '⚠ Erreur de sauvegarde');
+  } else {
+    setSyncBar('saved', '✓ Sauvegardé');
+  }
+}
+
+// ═══════════════════════════════════════
+// CONSTANTES
+// ═══════════════════════════════════════
+const JOURS=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+const MOIS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+function p2(n){return String(n).padStart(2,'0')}
+function isoStr(d){return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`}
+function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r}
+
+// ═══════════════════════════════════════
+// JOURS FÉRIÉS
+// ═══════════════════════════════════════
+function easter(yr){
+  const a=yr%19,b=Math.floor(yr/100),c=yr%100,d=Math.floor(b/4),e=b%4;
+  const f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30;
+  const i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
+  return new Date(yr,Math.floor((h+l-7*m+114)/31)-1,((h+l-7*m+114)%31)+1);
+}
+function mkFeries(yr){
+  const fix=[[1,1],[5,1],[5,8],[7,14],[8,15],[11,1],[11,11],[12,25]];
+  const e=easter(yr);
+  const days=fix.map(([m,d])=>new Date(yr,m-1,d));
+  days.push(addDays(e,1),addDays(e,39),addDays(e,49),addDays(e,50));
+  return new Set(days.map(isoStr));
+}
+const FERIES=new Set([...mkFeries(2025),...mkFeries(2026),...mkFeries(2027)]);
+const isFerie=dk=>FERIES.has(dk);
+
+// ═══════════════════════════════════════
+// PÉRIODES — label = mois de fin
+// ═══════════════════════════════════════
+function buildPeriods(){
+  const now=new Date();
+  const baseYear=now.getFullYear()-1;
+  const periods=[];
+  for(let i=0;i<24;i++){
+    const totalMo=baseYear*12+i;
+    const yr=Math.floor(totalMo/12),mo=totalMo%12;
+    const start=new Date(yr,mo,21);
+    const endMo=mo===11?0:mo+1,endYr=mo===11?yr+1:yr;
+    const end=new Date(endYr,endMo,20);
+    periods.push({start,end,label:`${MOIS[endMo]} ${endYr}`});
+  }
+  return periods;
+}
+const PERIODS=buildPeriods();
+function currentPeriodIdx(){
+  const now=new Date();
+  for(let i=0;i<PERIODS.length;i++)if(now>=PERIODS[i].start&&now<=PERIODS[i].end)return i;
+  return Math.floor(PERIODS.length/2);
+}
+
+// ═══════════════════════════════════════
+// SEMAINES
+// ═══════════════════════════════════════
+function buildWeeks(period){
+  const{start,end}=period;
+  const dow=start.getDay(),toMon=dow===0?-6:1-dow;
+  let wMon=new Date(start);wMon.setDate(wMon.getDate()+toMon);
+  const weeks=[];
+  while(wMon<=end){
+    const wSun=addDays(wMon,6);
+    const days=[];
+    for(let d=0;d<7;d++){const day=addDays(wMon,d);if(day>=start&&day<=end)days.push(day);}
+    if(days.length)weeks.push({wMon:new Date(wMon),wSun,days});
+    wMon=addDays(wMon,7);
+  }
+  return weeks;
+}
+
+// ═══════════════════════════════════════
+// CALCUL MAJORATIONS
+// ═══════════════════════════════════════
+function parseTime(str){
+  if(!str)return null;
+  const[h,m]=str.split(':').map(Number);
+  if(isNaN(h)||isNaN(m))return null;
+  return h+m/60;
+}
+function calcPremiums(calDate,startH,endH){
+  const startMin=Math.round(startH*60),endMin=Math.round(endH*60);
+  let nightMin=0,dimFerieMin=0;
+  for(let m=startMin;m<endMin;m++){
+    const minOfDay=m%1440;
+    if(minOfDay>=21*60||minOfDay<6*60)nightMin++;
+    const thisDay=addDays(calDate,Math.floor(m/1440));
+    if(thisDay.getDay()===0||isFerie(isoStr(thisDay)))dimFerieMin++;
+  }
+  return{totalH:(endMin-startMin)/60,nightH:nightMin/60,dimFerieH:dimFerieMin/60};
+}
+function tauxH(brut){return brut/151.67}
+function calcWeekHours(week,dayData,disabled){
+  let h=0;
+  week.days.forEach(day=>{
+    const dk=isoStr(day);if(disabled[dk])return;
+    const d=dayData[dk]||{};
+    const s=parseTime(d.start),e=parseTime(d.end);
+    if(s===null||e===null)return;
+    h+=(e<=s?e+24:e)-s;
+  });
+  return h;
+}
+
+// ═══════════════════════════════════════
+// CALCUL PAIE
+// ═══════════════════════════════════════
+function calcMonthPay(dayData,weekEndChoices,disabled,periodIdx,salaireBrut,tauxNet){
+  const period=PERIODS[periodIdx];
+  const weeks=buildWeeks(period);
+  const tx=tauxH(salaireBrut);
+  const coef=tauxNet/100;
+  let brutMaj=0,brutPoly=0,netPrimes=0;
+  let detail={nightH:0,dimFerieH:0,h125:0,h150:0};
+  weeks.forEach((week,wi)=>{
+    let wTot=0,wNight=0,wDimFerie=0;
+    week.days.forEach(day=>{
+      const dk=isoStr(day);if(disabled[dk])return;
+      const d=dayData[dk]||{};
+      const s=parseTime(d.start),e=parseTime(d.end);
+      if(s===null||e===null)return;
+      const ea=e<=s?e+24:e;
+      const{totalH,nightH,dimFerieH}=calcPremiums(day,s,ea);
+      wTot+=totalH;wNight+=nightH;wDimFerie+=dimFerieH;
+      detail.nightH+=nightH;detail.dimFerieH+=dimFerieH;
+      if(d.igd==='igd1')netPrimes+=92;
+      if(d.igd==='igd2')netPrimes+=41;
+      if(d.poly)brutPoly+=4;
+    });
+    let h125=0,h150=0;
+    if(wTot>43){h125=3;h150=wTot-43;}
+    else if(wTot>40){h125=wTot-40;}
+    detail.h125+=h125;detail.h150+=h150;
+    brutMaj+=h125*tx*0.25+h150*tx*0.50+wNight*tx*0.50+wDimFerie*tx*1.00;
+    const ch=weekEndChoices[`${periodIdx}-${wi}`];
+    const vm={pe1:35,pe2:60,pe3:90,vp1:90,vp2:125,vp3:200};
+    if(ch&&vm[ch])netPrimes+=vm[ch];
+  });
+  const brutTotal=salaireBrut+brutMaj+brutPoly;
+  const netBase=brutTotal*coef;
+  const netTotal=netBase+netPrimes;
+  return{
+    brutTotal:Math.round(brutTotal*100)/100,
+    netBase:Math.round(netBase*100)/100,
+    netPrimes:Math.round(netPrimes*100)/100,
+    netTotal:Math.round(netTotal*100)/100,
+    brutMaj:Math.round(brutMaj*100)/100,
+    detail
+  };
+}
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+let ST={salaire:1850,tauxNet:75.8,periodIdx:null,dayData:{},weekEndChoices:{},disabled:{}};
+
+function initApp(saved){
+  ST={
+    salaire: saved.salaire||1850,
+    tauxNet: saved.tauxNet||75.8,
+    periodIdx: saved.periodIdx!=null ? saved.periodIdx : currentPeriodIdx(),
+    dayData: saved.dayData||{},
+    weekEndChoices: saved.weekEndChoices||{},
+    disabled: saved.disabled||{}
+  };
+  document.getElementById('salaryInput').value=ST.salaire;
+  document.getElementById('tauxNetInput').value=ST.tauxNet;
+  renderTabs();
+  renderPage();
+}
+
+function save(){scheduleSave();}
+
+// ═══════════════════════════════════════
+// FORMAT
+// ═══════════════════════════════════════
+function fmt2(n){return n.toFixed(2)}
+function fmtH(h){const hh=Math.floor(h),mm=Math.round((h-hh)*60);return mm>0?`${hh}h${p2(mm)}`:`${hh}h`}
+function fmtDate(d){return `${p2(d.getDate())}/${p2(d.getMonth()+1)}/${d.getFullYear()}`}
+function fmtS(d){return `${p2(d.getDate())}/${p2(d.getMonth()+1)}`}
+
+// ═══════════════════════════════════════
+// RENDER TABS
+// ═══════════════════════════════════════
+function renderTabs(){
+  const el=document.getElementById('tabsEl');
+  el.innerHTML=PERIODS.map((p,i)=>`<button class="tab${i===ST.periodIdx?' active':''}" data-i="${i}">${p.label}</button>`).join('');
+  el.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>{
+    ST.periodIdx=+btn.dataset.i;save();renderTabs();renderPage();
+  }));
+  const a=el.querySelector('.tab.active');if(a)a.scrollIntoView({block:'nearest',inline:'center'});
+}
+
+// ═══════════════════════════════════════
+// RENDER PAGE
+// ═══════════════════════════════════════
+function renderPage(){
+  const period=PERIODS[ST.periodIdx];
+  const weeks=buildWeeks(period);
+  document.getElementById('periodBar').innerHTML=`Période&nbsp;: <strong>${fmtDate(period.start)}</strong> → <strong>${fmtDate(period.end)}</strong>`;
+  const pay=calcMonthPay(ST.dayData,ST.weekEndChoices,ST.disabled,ST.periodIdx,ST.salaire,ST.tauxNet);
+  const{brutTotal,netBase,netPrimes,netTotal,brutMaj,detail}=pay;
+  const detParts=[];
+  if(detail.nightH>0)detParts.push(`${fmtH(detail.nightH)} nuit`);
+  if(detail.dimFerieH>0)detParts.push(`${fmtH(detail.dimFerieH)} dim/fér.`);
+  if(detail.h125>0)detParts.push(`${fmtH(detail.h125)} sup.125%`);
+  if(detail.h150>0)detParts.push(`${fmtH(detail.h150)} sup.150%`);
+  const detStr=detParts.length?detParts.join(' · '):'—';
+
+  let html=`
+  <div class="print-header">
+    <h2>Récapitulatif — ${period.label}</h2>
+    <p>Période : ${fmtDate(period.start)} → ${fmtDate(period.end)} · Brut : ${ST.salaire}€ · Taux net : ${ST.tauxNet}%</p>
+  </div>
+  <div class="summary">
+    <div class="sum-grid">
+      <div class="sum-box"><div class="sum-lbl">Brut total</div><div class="sum-val prem" id="s-brut">${fmt2(brutTotal)} €</div></div>
+      <div class="sum-box"><div class="sum-lbl">Net estimé</div><div class="sum-val net" id="s-net">${fmt2(netBase)} €</div></div>
+      <div class="sum-box"><div class="sum-lbl">Net + primes</div><div class="sum-val tot" id="s-tot">${fmt2(netTotal)} €</div></div>
+    </div>
+    <div class="sum-detail" id="s-detail">
+      Majorations brutes <span id="sd-maj">${fmt2(brutMaj)}€</span> · Primes nettes <span id="sd-primes">${fmt2(netPrimes)}€</span><br>
+      Heures : <span>${detStr}</span>
+    </div>
+    <div class="sum-note">Formule : (brut total × ${ST.tauxNet}%) + primes nettes</div>
+  </div>
+  <div class="export-wrap"><button class="export-btn" onclick="window.print()">⬇ Télécharger / Imprimer le récapitulatif</button></div>`;
+
+  weeks.forEach((week,wi)=>{
+    const wKey=`${ST.periodIdx}-${wi}`;
+    const choice=ST.weekEndChoices[wKey]||null;
+    const wH=calcWeekHours(week,ST.dayData,ST.disabled);
+    let modH=0,sup125=0,sup150=0;
+    if(wH>43){modH=4;sup125=3;sup150=wH-43;}
+    else if(wH>40){modH=4;sup125=wH-40;}
+    else if(wH>35){modH=wH-35;}
+
+    html+=`<div class="week-block">
+    <div class="week-hdr">
+      <span class="week-title">Semaine ${wi+1} · ${fmtS(week.wMon)} – ${fmtS(week.wSun)}</span>
+      <span class="week-htotal" id="wh-${wKey}">${fmtH(wH)}</span>
+    </div>`;
+
+    week.days.forEach(day=>{
+      const dk=isoStr(day);
+      const dow=day.getDay(),hol=isFerie(dk),sun=dow===0,sat=dow===6;
+      const dis=!!ST.disabled[dk];
+      const d=ST.dayData[dk]||{};
+      let ncls='day-name';
+      if(hol)ncls+=' hol';else if(sun)ncls+=' sun';else if(sat)ncls+=' sat';
+      const badge=hol?'<span class="badge badge-hol">Férié</span>':'';
+      let resText='';
+      if(!dis){
+        const s=parseTime(d.start),e=parseTime(d.end);
+        if(s!==null&&e!==null){
+          const ea=e<=s?e+24:e;
+          const{totalH,nightH,dimFerieH}=calcPremiums(day,s,ea);
+          const parts=[];
+          if(totalH>0)parts.push(`${fmtH(totalH)} travaillées`);
+          if(nightH>0)parts.push(`${fmtH(nightH)} nuit +50%`);
+          if(dimFerieH>0)parts.push(`${fmtH(dimFerieH)} dim/fériés +100%`);
+          resText=parts.join(' · ');
+        }
+      }
+      html+=`<div class="day-row${dis?' disabled':''}" id="row-${dk}">
+        <div class="day-top">
+          <div class="${ncls}">${JOURS[dow]} ${p2(day.getDate())}/${p2(day.getMonth()+1)} ${badge}</div>
+          <button class="day-toggle${dis?' off':''}" data-dk="${dk}"></button>
+        </div>
+        <div class="day-body" id="body-${dk}" style="${dis?'display:none':''}">
+          <div class="inputs-row">
+            <div class="t-group"><span class="t-lbl">Début</span><input type="time" class="t-input" data-dk="${dk}" data-f="start" value="${d.start||''}"></div>
+            <div class="t-group"><span class="t-lbl">Fin</span><input type="time" class="t-input" data-dk="${dk}" data-f="end" value="${d.end||''}"></div>
+          </div>
+          <div class="opts-row">
+            <button class="igd-btn${d.igd==='igd1'?' sel':''}" data-dk="${dk}" data-igd="igd1">IGD1 92€</button>
+            <button class="igd-btn${d.igd==='igd2'?' sel':''}" data-dk="${dk}" data-igd="igd2">IGD2 41€</button>
+            <label class="poly-wrap"><input type="checkbox" data-dk="${dk}" data-f="poly"${d.poly?' checked':''}> Polycompétence +4€</label>
+          </div>
+          <div class="day-result" id="dr-${dk}">${resText}</div>
+        </div>
+      </div>`;
+    });
+
+    html+=`<div class="mod-bar" id="mb-${wKey}">
+      <div class="mod-item"><div class="mod-num ${modH>0?'warn':'zero'}">${fmtH(modH)}</div><div class="mod-lbl">Modulation</div></div>
+      <div class="mod-item"><div class="mod-num ${sup125>0?'pos':'zero'}">${fmtH(sup125)}</div><div class="mod-lbl">Sup. 125%</div></div>
+      <div class="mod-item"><div class="mod-num ${sup150>0?'pos':'zero'}">${fmtH(sup150)}</div><div class="mod-lbl">Sup. 150%</div></div>
+    </div>`;
+
+    const PE=[['pe1','PE1 35€'],['pe2','PE2 60€'],['pe3','PE3 90€']];
+    const VP=[['vp1','VP1 90€'],['vp2','VP2 125€'],['vp3','VP3 200€']];
+    html+=`<div class="week-end">
+      <div class="we-lbl">Indemnité fin de semaine :</div>
+      <div class="we-groups">
+        <div class="we-group">${PE.map(([k,l])=>`<button class="we-btn${choice===k?' sel-pe':''}" data-wk="${wKey}" data-c="${k}">${l}</button>`).join('')}</div>
+        <div class="we-group">${VP.map(([k,l])=>`<button class="we-btn${choice===k?' sel-vp':''}" data-wk="${wKey}" data-c="${k}">${l}</button>`).join('')}</div>
+      </div>
+    </div></div>`;
+  });
+
+  document.getElementById('root').innerHTML=html;
+  bindEvents();
+}
+
+// ═══════════════════════════════════════
+// EVENTS
+// ═══════════════════════════════════════
+function bindEvents(){
+  document.querySelectorAll('.t-input').forEach(inp=>inp.addEventListener('change',e=>{
+    const dk=e.target.dataset.dk,f=e.target.dataset.f;
+    if(!ST.dayData[dk])ST.dayData[dk]={};
+    ST.dayData[dk][f]=e.target.value;
+    save();updateDayResult(dk);updateWeekFromDay(dk);updateSummaryBar();
+  }));
+  document.querySelectorAll('.igd-btn').forEach(btn=>btn.addEventListener('click',e=>{
+    const dk=e.target.dataset.dk,igd=e.target.dataset.igd;
+    if(!ST.dayData[dk])ST.dayData[dk]={};
+    ST.dayData[dk].igd=ST.dayData[dk].igd===igd?null:igd;
+    save();
+    document.querySelectorAll(`.igd-btn[data-dk="${dk}"]`).forEach(b=>b.classList.toggle('sel',b.dataset.igd===ST.dayData[dk].igd));
+    updateSummaryBar();
+  }));
+  document.querySelectorAll('[data-f="poly"]').forEach(cb=>cb.addEventListener('change',e=>{
+    const dk=e.target.dataset.dk;
+    if(!ST.dayData[dk])ST.dayData[dk]={};
+    ST.dayData[dk].poly=e.target.checked;
+    save();updateSummaryBar();
+  }));
+  document.querySelectorAll('.we-btn').forEach(btn=>btn.addEventListener('click',e=>{
+    const wk=e.target.dataset.wk,c=e.target.dataset.c;
+    ST.weekEndChoices[wk]=ST.weekEndChoices[wk]===c?null:c;
+    save();
+    document.querySelectorAll(`.we-btn[data-wk="${wk}"]`).forEach(b=>{
+      b.classList.remove('sel-pe','sel-vp');
+      if(b.dataset.c===ST.weekEndChoices[wk])b.classList.add(b.dataset.c.startsWith('pe')?'sel-pe':'sel-vp');
+    });
+    updateSummaryBar();
+  }));
+  document.querySelectorAll('.day-toggle').forEach(btn=>btn.addEventListener('click',e=>{
+    const dk=e.target.dataset.dk;
+    ST.disabled[dk]=!ST.disabled[dk];
+    if(!ST.disabled[dk])delete ST.disabled[dk];
+    save();
+    const dis=!!ST.disabled[dk];
+    btn.classList.toggle('off',dis);
+    document.getElementById(`row-${dk}`).classList.toggle('disabled',dis);
+    document.getElementById(`body-${dk}`).style.display=dis?'none':'';
+    updateDayResult(dk);updateWeekFromDay(dk);updateSummaryBar();
+  }));
+  document.getElementById('salaryInput').addEventListener('change',e=>{
+    ST.salaire=parseFloat(e.target.value)||1850;save();updateSummaryBar();
+  });
+  document.getElementById('tauxNetInput').addEventListener('change',e=>{
+    ST.tauxNet=parseFloat(e.target.value)||75.8;save();updateSummaryBar();
+  });
+}
+
+function updateDayResult(dk){
+  const el=document.getElementById(`dr-${dk}`);if(!el)return;
+  if(ST.disabled[dk]){el.textContent='';return;}
+  const d=ST.dayData[dk]||{};
+  const s=parseTime(d.start),e=parseTime(d.end);
+  if(s===null||e===null){el.textContent='';return;}
+  const ea=e<=s?e+24:e;
+  const[yr,mo,dy]=dk.split('-').map(Number);
+  const{totalH,nightH,dimFerieH}=calcPremiums(new Date(yr,mo-1,dy),s,ea);
+  const parts=[];
+  if(totalH>0)parts.push(`${fmtH(totalH)} travaillées`);
+  if(nightH>0)parts.push(`${fmtH(nightH)} nuit +50%`);
+  if(dimFerieH>0)parts.push(`${fmtH(dimFerieH)} dim/fériés +100%`);
+  el.textContent=parts.join(' · ');
+}
+
+function updateWeekFromDay(dk){
+  const weeks=buildWeeks(PERIODS[ST.periodIdx]);
+  weeks.forEach((week,wi)=>{
+    if(!week.days.some(d=>isoStr(d)===dk))return;
+    const wKey=`${ST.periodIdx}-${wi}`;
+    const wH=calcWeekHours(week,ST.dayData,ST.disabled);
+    const el=document.getElementById(`wh-${wKey}`);if(el)el.textContent=fmtH(wH);
+    let modH=0,sup125=0,sup150=0;
+    if(wH>43){modH=4;sup125=3;sup150=wH-43;}
+    else if(wH>40){modH=4;sup125=wH-40;}
+    else if(wH>35){modH=wH-35;}
+    const mb=document.getElementById(`mb-${wKey}`);
+    if(mb)mb.innerHTML=`
+      <div class="mod-item"><div class="mod-num ${modH>0?'warn':'zero'}">${fmtH(modH)}</div><div class="mod-lbl">Modulation</div></div>
+      <div class="mod-item"><div class="mod-num ${sup125>0?'pos':'zero'}">${fmtH(sup125)}</div><div class="mod-lbl">Sup. 125%</div></div>
+      <div class="mod-item"><div class="mod-num ${sup150>0?'pos':'zero'}">${fmtH(sup150)}</div><div class="mod-lbl">Sup. 150%</div></div>`;
+  });
+}
+
+function updateSummaryBar(){
+  const pay=calcMonthPay(ST.dayData,ST.weekEndChoices,ST.disabled,ST.periodIdx,ST.salaire,ST.tauxNet);
+  const{brutTotal,netBase,netPrimes,netTotal,brutMaj,detail}=pay;
+  const sb=document.getElementById('s-brut'),sn=document.getElementById('s-net'),st=document.getElementById('s-tot');
+  const sdm=document.getElementById('sd-maj'),sdp=document.getElementById('sd-primes');
+  if(sb)sb.textContent=`${fmt2(brutTotal)} €`;
+  if(sn)sn.textContent=`${fmt2(netBase)} €`;
+  if(st)st.textContent=`${fmt2(netTotal)} €`;
+  if(sdm)sdm.textContent=`${fmt2(brutMaj)}€`;
+  if(sdp)sdp.textContent=`${fmt2(netPrimes)}€`;
+}
+
+// Touche Entrée sur les champs auth
+document.getElementById('authPass').addEventListener('keydown',e=>{if(e.key==='Enter')doAuth();});
+document.getElementById('authEmail').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('authPass').focus();});
+</script>
+</body>
+</html>
