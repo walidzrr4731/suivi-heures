@@ -1,0 +1,1563 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Suivi Heures</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:#0d0f18;--surface:#161928;--card:#1e2235;--border:#2a2f4a;
+  --accent:#5b8ff9;--accent2:#f7b84f;--green:#3ecf8e;--red:#f05252;
+  --purple:#c084fc;--text:#e4e8f5;--muted:#7580a8;--radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,'Segoe UI',sans-serif;min-height:100vh;font-size:14px}
+
+/* AUTH */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.auth-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:28px 24px;width:100%;max-width:360px}
+.auth-logo{text-align:center;font-size:28px;margin-bottom:6px}
+.auth-title{text-align:center;font-size:18px;font-weight:800;color:var(--accent);margin-bottom:4px}
+.auth-sub{text-align:center;font-size:12px;color:var(--muted);margin-bottom:24px}
+.auth-tabs{display:flex;gap:0;margin-bottom:20px;background:var(--card);border-radius:8px;padding:3px}
+.auth-tab{flex:1;padding:8px;text-align:center;font-size:13px;font-weight:600;color:var(--muted);border:none;background:none;border-radius:6px;cursor:pointer;transition:all .2s}
+.auth-tab.active{background:var(--accent);color:#fff}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;color:var(--muted);margin-bottom:5px;font-weight:600}
+.field input{width:100%;background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:11px 12px;font-size:14px;font-family:inherit;transition:border .2s}
+.field input:focus{outline:none;border-color:var(--accent)}
+.remember-row{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.remember-row input[type="checkbox"]{accent-color:var(--accent);width:15px;height:15px;cursor:pointer}
+.remember-row label{font-size:12px;color:var(--muted);cursor:pointer}
+.forgot-link{text-align:right;margin-bottom:14px}
+.forgot-link a{font-size:12px;color:var(--accent);text-decoration:none;cursor:pointer}
+.btn-auth{width:100%;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;transition:opacity .2s}
+.btn-auth:active{opacity:.8}
+.btn-auth:disabled{opacity:.5;cursor:not-allowed}
+.auth-msg{text-align:center;font-size:12px;margin-top:12px;min-height:18px}
+.auth-msg.err{color:var(--red)}
+.auth-msg.ok{color:var(--green)}
+
+/* FORGOT PASSWORD MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:999;padding:20px}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;width:100%;max-width:340px}
+.modal-title{font-size:15px;font-weight:700;color:var(--accent);margin-bottom:6px}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5}
+.modal-btns{display:flex;gap:8px;margin-top:16px}
+.btn-cancel{flex:1;padding:10px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer}
+.btn-send{flex:1;padding:10px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:700;cursor:pointer}
+
+/* APP */
+.app-wrap{display:none}
+.hdr{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;gap:8px}
+.hdr-left{display:flex;align-items:center;gap:8px}
+.hdr-title{font-size:15px;font-weight:700;color:var(--accent);flex-shrink:0}
+.hdr-user{font-size:10px;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hdr-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.inp-grp{display:flex;align-items:center;gap:4px}
+.inp-grp label{font-size:10px;color:var(--muted);white-space:nowrap}
+.inp-grp input{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:5px 7px;font-size:12px;text-align:right;font-family:inherit}
+.inp-grp input.w-sal{width:78px}
+.inp-grp input.w-taux{width:52px}
+.inp-grp span{font-size:11px;color:var(--muted)}
+.btn-logout{padding:5px 10px;background:var(--card);border:1px solid var(--border);border-radius:7px;color:var(--red);font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap}
+
+.sync-bar{background:var(--surface);border-bottom:1px solid var(--border);text-align:center;padding:4px;font-size:10px;color:var(--muted);min-height:24px}
+.sync-bar.saving{color:var(--accent2)}
+.sync-bar.saved{color:var(--green)}
+.sync-bar.err{color:var(--red)}
+
+/* NAV TABS (vues : Suivi / Calendrier / Stats) */
+.nav-bar{background:var(--surface);border-bottom:1px solid var(--border);display:flex;padding:0 8px}
+.nav-btn{flex:1;padding:9px 4px;font-size:12px;font-weight:700;color:var(--muted);background:none;border:none;border-bottom:3px solid transparent;cursor:pointer;transition:all .2s;text-align:center}
+.nav-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* VIEWS */
+.view{display:none}
+.view.active{display:block}
+
+/* PERIOD TABS */
+.tabs-bar{background:var(--surface);border-bottom:1px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tabs-bar::-webkit-scrollbar{display:none}
+.tabs{display:flex;padding:0 6px;min-width:max-content;align-items:center}
+.tab{padding:9px 13px;font-size:12px;font-weight:600;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:color .15s}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-add{padding:6px 10px;font-size:16px;color:var(--green);background:none;border:none;cursor:pointer;font-weight:700}
+
+.pbar{background:var(--surface);border-bottom:1px solid var(--border);text-align:center;padding:5px;font-size:10px;color:var(--muted)}
+.pbar strong{color:var(--accent2)}
+
+.summary{margin:10px 10px 6px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px}
+.sum-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.sum-box{text-align:center}
+.sum-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.sum-val{font-size:15px;font-weight:800}
+.sum-val.net{color:var(--green)}.sum-val.prem{color:var(--accent2)}.sum-val.tot{color:var(--accent)}
+.sum-detail{margin-top:6px;font-size:10px;color:var(--muted);text-align:center;line-height:1.5}
+.sum-detail span{color:var(--text)}
+.sum-note{margin-top:6px;font-size:9px;color:var(--muted);text-align:center}
+
+.export-wrap{margin:0 10px 8px}
+.export-btn{width:100%;padding:9px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;text-align:center;display:block}
+
+.week-block{margin:0 10px 10px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.week-hdr{background:var(--surface);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.week-title{font-size:12px;font-weight:700;color:var(--accent)}
+.week-htotal{font-size:11px;color:var(--muted)}
+.mod-bar{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--border)}
+.mod-item{padding:6px 0;text-align:center}
+.mod-item:not(:last-child){border-right:1px solid var(--border)}
+.mod-num{font-size:13px;font-weight:700}
+.mod-num.pos{color:var(--green)}.mod-num.warn{color:var(--accent2)}.mod-num.zero{color:var(--muted)}
+.mod-lbl{font-size:9px;color:var(--muted);margin-top:1px}
+.week-end{padding:8px 12px;background:var(--bg);border-top:1px solid var(--border)}
+.we-lbl{font-size:10px;color:var(--muted);font-weight:600;margin-bottom:6px}
+.we-groups{display:flex;gap:8px;flex-wrap:wrap}
+.we-group{display:flex;gap:4px}
+.we-btn{padding:4px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-size:11px;cursor:pointer;transition:all .15s}
+.we-btn.sel-pe{background:rgba(91,143,249,.15);border-color:var(--accent);color:var(--accent);font-weight:700}
+.we-btn.sel-vp{background:rgba(62,207,142,.15);border-color:var(--green);color:var(--green);font-weight:700}
+
+.day-row{border-bottom:1px solid var(--border);padding:8px 12px;transition:opacity .2s}
+.day-row.disabled{opacity:.35}
+.day-row:last-of-type{border-bottom:none}
+.day-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.day-name{font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px}
+.day-name.sun{color:var(--red)}.day-name.hol{color:var(--purple)}.day-name.sat{color:var(--accent2)}
+.badge{font-size:9px;padding:1px 5px;border-radius:4px;font-weight:600}
+.badge-hol{background:rgba(192,132,252,.15);color:var(--purple)}
+.day-toggle{width:36px;height:20px;border-radius:10px;background:var(--green);border:none;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
+.day-toggle::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .2s}
+.day-toggle.off{background:var(--border)}
+.day-toggle.off::after{transform:translateX(16px)}
+.inputs-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.t-group{display:flex;align-items:center;gap:4px}
+.t-lbl{font-size:10px;color:var(--muted)}
+.t-input{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:6px 8px;width:75px;font-size:13px;text-align:center;font-family:inherit}
+.t-input:focus{outline:none;border-color:var(--accent)}
+.opts-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.igd-btn{padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-size:11px;cursor:pointer;transition:all .15s}
+.igd-btn.sel{background:rgba(91,143,249,.15);border-color:var(--accent);color:var(--accent);font-weight:700}
+.poly-wrap{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer}
+.poly-wrap input{accent-color:var(--accent2);width:13px;height:13px;cursor:pointer}
+.day-result{font-size:10px;color:var(--accent2);margin-top:4px;min-height:13px}
+.chantier-row{display:flex;align-items:center;gap:6px;margin-top:6px}
+.chantier-lbl{font-size:10px;color:var(--muted);white-space:nowrap}
+.chantier-input{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:6px 8px;font-size:12px;font-family:inherit}
+.chantier-input:focus{outline:none;border-color:var(--accent)}
+.chantier-input::placeholder{color:var(--muted)}
+.spacer{height:24px}
+
+/* ═══ CALENDRIER ═══ */
+.cal-wrap{padding:10px}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.cal-nav-btn{padding:6px 14px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;cursor:pointer}
+.cal-month-label{font-size:15px;font-weight:700;color:var(--accent)}
+.cal-grid{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.cal-header{display:grid;grid-template-columns:repeat(7,1fr);background:var(--surface)}
+.cal-header-day{padding:7px 0;text-align:center;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase}
+.cal-body{display:grid;grid-template-columns:repeat(7,1fr)}
+.cal-cell{padding:5px 3px;min-height:54px;border-top:1px solid var(--border);border-right:1px solid var(--border);position:relative;cursor:pointer;transition:background .15s}
+.cal-cell:nth-child(7n){border-right:none}
+.cal-cell:hover{background:rgba(91,143,249,.08)}
+.cal-cell.other-month{opacity:.3}
+.cal-cell.today .cal-day-num{background:var(--accent);color:#fff;border-radius:50%}
+.cal-cell.has-data{border-bottom:2px solid var(--green)}
+.cal-cell.is-ferie{background:rgba(192,132,252,.07)}
+.cal-cell.is-sunday{background:rgba(240,82,82,.05)}
+.cal-day-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;font-size:11px;font-weight:600;margin-bottom:2px}
+.cal-day-info{font-size:9px;color:var(--muted);line-height:1.2}
+.cal-day-hours{color:var(--green);font-weight:700}
+.cal-day-hol{color:var(--purple);font-size:8px}
+.cal-week-row{display:contents}
+.cal-week-label{position:absolute;top:3px;right:3px;font-size:8px;color:var(--accent);font-weight:700;cursor:pointer;padding:1px 3px;background:rgba(91,143,249,.12);border-radius:3px}
+.cal-week-label:hover{background:rgba(91,143,249,.25)}
+
+/* ═══ STATS ═══ */
+.stats-wrap{padding:10px}
+.stats-toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+.stats-mode-btn{padding:6px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+.stats-mode-btn.active{background:rgba(91,143,249,.15);border-color:var(--accent);color:var(--accent)}
+.stats-selectors{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+.stats-sel{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 10px;font-size:12px;font-family:inherit;cursor:pointer}
+.stats-sel:focus{outline:none;border-color:var(--accent)}
+.stats-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px}
+.stats-card-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px}
+.stats-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.stats-kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;text-align:center}
+.stats-kpi-val{font-size:20px;font-weight:800;margin-bottom:3px}
+.stats-kpi-lbl{font-size:10px;color:var(--muted)}
+.stats-period-label{font-size:13px;font-weight:700;color:var(--accent);margin-bottom:10px}
+.chart-container{position:relative;height:200px;width:100%}
+.stats-empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px}
+/* Custom period */
+.custom-period-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.custom-period-row label{font-size:11px;color:var(--muted);font-weight:600}
+.custom-period-row input[type="date"]{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:7px 10px;font-size:12px;font-family:inherit}
+.btn-custom-go{padding:7px 14px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:12px;font-weight:700;cursor:pointer}
+
+@media print {
+  body{background:#fff;color:#000;font-size:11px}
+  .hdr,.tabs-bar,.pbar,.export-wrap,.day-toggle,.opts-row,.mod-bar,.week-end,.sync-bar,.auth-wrap,.nav-bar,.cal-wrap,.stats-wrap{display:none!important}
+  .app-wrap{display:block!important}
+  .summary{border:1px solid #ccc;border-radius:4px;margin:8px 0}
+  .sum-val.net,.sum-val.prem,.sum-val.tot,.sum-detail span{color:#000}
+  .sum-note,.sum-lbl,.sum-detail{color:#555}
+  .week-block{border:1px solid #ccc;border-radius:4px;margin:8px 0;break-inside:avoid}
+  .week-hdr{background:#f0f0f0}
+  .week-title,.week-htotal{color:#000}
+  .day-row{border-bottom:1px solid #eee}
+  .day-row.disabled{display:none}
+  .day-name,.day-name.sun,.day-name.hol,.day-name.sat{color:#000}
+  .t-input{border:1px solid #ccc;background:#fff;color:#000}
+  .day-result{color:#555}
+  .print-header{display:block!important}
+}
+.print-header{display:none;text-align:center;margin-bottom:12px}
+.print-header h2{font-size:16px;font-weight:700}
+.print-header p{font-size:11px;color:#555;margin-top:4px}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div class="auth-wrap" id="authWrap">
+  <div class="auth-box">
+    <div class="auth-logo">⏱</div>
+    <div class="auth-title">Suivi Heures</div>
+    <div class="auth-sub">Connecte-toi pour accéder à tes données</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabLogin" onclick="switchTab('login')">Connexion</button>
+      <button class="auth-tab" id="tabRegister" onclick="switchTab('register')">Inscription</button>
+    </div>
+    <div class="field"><label>Email</label><input type="email" id="authEmail" placeholder="ton@email.com" autocomplete="email"></div>
+    <div class="field"><label>Mot de passe</label><input type="password" id="authPass" placeholder="••••••••" autocomplete="current-password"></div>
+    <div class="remember-row" id="rememberRow">
+      <input type="checkbox" id="rememberMe">
+      <label for="rememberMe">Se souvenir de moi</label>
+    </div>
+    <div class="forgot-link" id="forgotRow"><a onclick="openForgot()">Mot de passe oublié ?</a></div>
+    <button class="btn-auth" id="authBtn" onclick="doAuth()">Se connecter</button>
+    <div class="auth-msg" id="authMsg"></div>
+  </div>
+</div>
+
+<!-- FORGOT PASSWORD MODAL -->
+<div class="modal-overlay" id="forgotModal" style="display:none">
+  <div class="modal-box">
+    <div class="modal-title">🔑 Réinitialiser le mot de passe</div>
+    <div class="modal-sub">Saisis ton email et nous t'enverrons un lien de réinitialisation.</div>
+    <div class="field"><label>Email</label><input type="email" id="forgotEmail" placeholder="ton@email.com" autocomplete="email"></div>
+    <div class="auth-msg" id="forgotMsg"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeForgot()">Annuler</button>
+      <button class="btn-send" onclick="sendForgot()">Envoyer</button>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app-wrap" id="appWrap">
+  <div class="hdr">
+    <div class="hdr-left">
+      <div class="hdr-title">⏱ Suivi Heures</div>
+      <div class="hdr-user" id="hdrUser"></div>
+    </div>
+    <div class="hdr-right">
+      <div class="inp-grp">
+        <label>Brut</label>
+        <input type="number" id="salaryInput" class="w-sal" value="1850" min="0" step="10">
+        <span>€</span>
+      </div>
+      <div class="inp-grp">
+        <label>Taux</label>
+        <input type="number" id="tauxNetInput" class="w-taux" value="75.8" min="50" max="95" step="0.1">
+        <span>%</span>
+      </div>
+      <button class="btn-logout" onclick="doLogout()">⏏ Quitter</button>
+    </div>
+  </div>
+  <div class="sync-bar" id="syncBar">Chargement…</div>
+
+  <!-- NAV VIEWS -->
+  <div class="nav-bar">
+    <button class="nav-btn active" id="nav-suivi" onclick="switchView('suivi')">📋 Suivi</button>
+    <button class="nav-btn" id="nav-cal" onclick="switchView('cal')">📅 Calendrier</button>
+    <button class="nav-btn" id="nav-stats" onclick="switchView('stats')">📊 Statistiques</button>
+  </div>
+
+  <!-- VIEW SUIVI -->
+  <div class="view active" id="view-suivi">
+    <div class="tabs-bar"><div class="tabs" id="tabsEl"></div></div>
+    <div class="pbar" id="periodBar"></div>
+    <div id="root"></div>
+    <div class="spacer"></div>
+  </div>
+
+  <!-- VIEW CALENDRIER -->
+  <div class="view" id="view-cal">
+    <div class="cal-wrap">
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="calPrev()">‹</button>
+        <span class="cal-month-label" id="calMonthLabel"></span>
+        <button class="cal-nav-btn" onclick="calNext()">›</button>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-header">
+          <div class="cal-header-day">Lun</div>
+          <div class="cal-header-day">Mar</div>
+          <div class="cal-header-day">Mer</div>
+          <div class="cal-header-day">Jeu</div>
+          <div class="cal-header-day">Ven</div>
+          <div class="cal-header-day" style="color:var(--accent2)">Sam</div>
+          <div class="cal-header-day" style="color:var(--red)">Dim</div>
+        </div>
+        <div class="cal-body" id="calBody"></div>
+      </div>
+      <div style="margin-top:10px;font-size:10px;color:var(--muted);text-align:center">
+        Clique sur un jour ou sur <span style="color:var(--accent);font-weight:700">S##</span> pour aller à cette semaine
+      </div>
+    </div>
+  </div>
+
+  <!-- VIEW STATS -->
+  <div class="view" id="view-stats">
+    <div class="stats-wrap">
+      <div class="stats-toolbar">
+        <button class="stats-mode-btn active" id="sm-mois" onclick="setStatsMode('mois')">Par mois</button>
+        <button class="stats-mode-btn" id="sm-annee" onclick="setStatsMode('annee')">Année civile</button>
+        <button class="stats-mode-btn" id="sm-custom" onclick="setStatsMode('custom')">Période libre</button>
+      </div>
+
+      <!-- Sélecteurs mois -->
+      <div id="stats-sel-mois" class="stats-selectors">
+        <select class="stats-sel" id="statsMonthSel" onchange="renderStats()"></select>
+      </div>
+
+      <!-- Sélecteur année -->
+      <div id="stats-sel-annee" class="stats-selectors" style="display:none">
+        <select class="stats-sel" id="statsYearSel" onchange="renderStats()"></select>
+      </div>
+
+      <!-- Période libre -->
+      <div id="stats-sel-custom" style="display:none">
+        <div class="custom-period-row">
+          <label>Du</label><input type="date" id="statsDateFrom">
+          <label>au</label><input type="date" id="statsDateTo">
+          <button class="btn-custom-go" onclick="renderStats()">Afficher</button>
+        </div>
+      </div>
+
+      <div id="statsContent"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// SUPABASE
+// ═══════════════════════════════════════
+const SUPA_URL = 'https://vfffthzmhnkwdsagsbbr.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmZmZ0aHptaG5rd2RzYWdzYmJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1NTk2MDMsImV4cCI6MjA5NzEzNTYwM30.JZWUMiBnWx6kyQhHtBDvTRyRQo1zuQV2gh24OxdrENI';
+const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+let currentUser = null;
+let saveTimer = null;
+
+// ═══════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════
+let authMode = 'login';
+function switchTab(mode) {
+  authMode = mode;
+  document.getElementById('tabLogin').classList.toggle('active', mode==='login');
+  document.getElementById('tabRegister').classList.toggle('active', mode==='register');
+  document.getElementById('authBtn').textContent = mode==='login' ? 'Se connecter' : "S'inscrire";
+  document.getElementById('authMsg').textContent = '';
+  document.getElementById('rememberRow').style.display = mode==='login' ? 'flex' : 'none';
+  document.getElementById('forgotRow').style.display = mode==='login' ? 'block' : 'none';
+}
+
+async function doAuth() {
+  const email = document.getElementById('authEmail').value.trim();
+  const pass  = document.getElementById('authPass').value;
+  const remember = document.getElementById('rememberMe').checked;
+  const btn   = document.getElementById('authBtn');
+  if (!email || !pass) { showMsg('Remplis tous les champs', 'err'); return; }
+  btn.disabled = true; btn.textContent = '…';
+  let result;
+  if (authMode === 'login') {
+    // Si "se souvenir" on utilise persistSession=true (défaut), sinon on demande session courte
+    result = await supa.auth.signInWithPassword({ email, password: pass });
+    if (!result.error && !remember) {
+      // On stocke une info pour logout auto à la fermeture (simulé via sessionStorage)
+      sessionStorage.setItem('noRemember', '1');
+    } else {
+      sessionStorage.removeItem('noRemember');
+    }
+  } else {
+    result = await supa.auth.signUp({ email, password: pass });
+  }
+  btn.disabled = false;
+  btn.textContent = authMode==='login' ? 'Se connecter' : "S'inscrire";
+  if (result.error) {
+    showMsg(friendlyError(result.error.message), 'err');
+  } else if (authMode==='register' && !result.data.session) {
+    showMsg('Vérifie ton email pour confirmer ton compte', 'ok');
+  } else {
+    showMsg('', '');
+  }
+}
+
+// Mot de passe oublié
+function openForgot() {
+  document.getElementById('forgotEmail').value = document.getElementById('authEmail').value;
+  document.getElementById('forgotMsg').textContent = '';
+  document.getElementById('forgotMsg').className = 'auth-msg';
+  document.getElementById('forgotModal').style.display = 'flex';
+}
+function closeForgot() {
+  document.getElementById('forgotModal').style.display = 'none';
+}
+async function sendForgot() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  if (!email) { setForgotMsg('Saisis ton email', 'err'); return; }
+  const { error } = await supa.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.href
+  });
+  if (error) { setForgotMsg(friendlyError(error.message), 'err'); }
+  else { setForgotMsg('Email envoyé ! Vérifie ta boîte.', 'ok'); }
+}
+function setForgotMsg(txt, type) {
+  const el = document.getElementById('forgotMsg');
+  el.textContent = txt; el.className = 'auth-msg' + (type ? ' '+type : '');
+}
+
+function friendlyError(msg) {
+  if (msg.includes('Invalid login')) return 'Email ou mot de passe incorrect';
+  if (msg.includes('already registered')) return 'Cet email est déjà utilisé';
+  if (msg.includes('Password should')) return 'Mot de passe trop court (6 min)';
+  if (msg.includes('valid email')) return 'Email invalide';
+  if (msg.includes('rate limit')) return 'Trop de tentatives, attends un moment';
+  return msg;
+}
+function showMsg(txt, type) {
+  const el = document.getElementById('authMsg');
+  el.textContent = txt;
+  el.className = 'auth-msg' + (type ? ' '+type : '');
+}
+
+supa.auth.onAuthStateChange((event, session) => {
+  if (session) {
+    // Si noRemember et on recharge la page (nouvelle session navigateur) → déconnecte
+    if (sessionStorage.getItem('noRemember') === '1' && event === 'INITIAL_SESSION') {
+      // On laisse passer : l'utilisateur a coché "ne pas se souvenir" mais est encore dans la session courante
+    }
+    currentUser = session.user;
+    document.getElementById('authWrap').style.display = 'none';
+    document.getElementById('appWrap').style.display = 'block';
+    document.getElementById('hdrUser').textContent = currentUser.email;
+    loadUserData();
+  } else {
+    currentUser = null;
+    document.getElementById('authWrap').style.display = 'flex';
+    document.getElementById('appWrap').style.display = 'none';
+  }
+});
+
+async function doLogout() {
+  sessionStorage.removeItem('noRemember');
+  await supa.auth.signOut();
+}
+
+// ═══════════════════════════════════════
+// SAVE / LOAD SUPABASE
+// ═══════════════════════════════════════
+function setSyncBar(state, txt) {
+  const el = document.getElementById('syncBar');
+  el.className = 'sync-bar' + (state ? ' '+state : '');
+  el.textContent = txt;
+}
+
+async function loadUserData() {
+  setSyncBar('', 'Chargement…');
+  const { data, error } = await supa
+    .from('user_data')
+    .select('data')
+    .eq('user_id', currentUser.id)
+    .single();
+  if (error && error.code !== 'PGRST116') {
+    setSyncBar('err', 'Erreur de chargement');
+    initApp({});
+    return;
+  }
+  const saved = data?.data || {};
+  initApp(saved);
+  setSyncBar('saved', '✓ Données chargées');
+}
+
+let saveDirty = false;
+
+function scheduleSave() {
+  setSyncBar('saving', 'Sauvegarde…');
+  saveDirty = true;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveUserData, 1500);
+}
+
+async function saveUserData() {
+  if (!currentUser) return;
+  const payload = {
+    user_id: currentUser.id,
+    data: {
+      salaire: ST.salaire,
+      tauxNet: ST.tauxNet,
+      periodIdx: ST.periodIdx,
+      dayData: ST.dayData,
+      weekEndChoices: ST.weekEndChoices,
+      disabled: ST.disabled,
+      extraPeriods: ST.extraPeriods
+    },
+    updated_at: new Date().toISOString()
+  };
+  const { error } = await supa
+    .from('user_data')
+    .upsert(payload, { onConflict: 'user_id' });
+  if (error) {
+    setSyncBar('err', '⚠ Erreur de sauvegarde — nouvelle tentative…');
+    // Une seule relance automatique après 3s en cas d'échec (réseau coupé par ex.)
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveUserData, 3000);
+  } else {
+    saveDirty = false;
+    setSyncBar('saved', '✓ Sauvegardé');
+  }
+}
+
+// ═══════════════════════════════════════
+// CONSTANTES
+// ═══════════════════════════════════════
+const JOURS=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+const JOURS_COURT=['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+const MOIS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+const MOIS_COURT=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+function p2(n){return String(n).padStart(2,'0')}
+function isoStr(d){return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`}
+function addDays(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r}
+
+// ═══════════════════════════════════════
+// JOURS FÉRIÉS
+// ═══════════════════════════════════════
+function easter(yr){
+  const a=yr%19,b=Math.floor(yr/100),c=yr%100,d=Math.floor(b/4),e=b%4;
+  const f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30;
+  const i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
+  return new Date(yr,Math.floor((h+l-7*m+114)/31)-1,((h+l-7*m+114)%31)+1);
+}
+function mkFeries(yr){
+  const fix=[[1,1],[5,1],[5,8],[7,14],[8,15],[11,1],[11,11],[12,25]];
+  const e=easter(yr);
+  const days=fix.map(([m,d])=>new Date(yr,m-1,d));
+  days.push(addDays(e,1),addDays(e,39),addDays(e,49),addDays(e,50));
+  return new Set(days.map(isoStr));
+}
+const FERIES=new Set([...mkFeries(2025),...mkFeries(2026),...mkFeries(2027),...mkFeries(2028)]);
+const isFerie=dk=>FERIES.has(dk);
+
+// Numéro de semaine ISO
+function isoWeekNum(d){
+  const tmp=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const dayN=tmp.getUTCDay()||7;
+  tmp.setUTCDate(tmp.getUTCDate()+4-dayN);
+  const yearStart=new Date(Date.UTC(tmp.getUTCFullYear(),0,1));
+  return{week:Math.ceil((((tmp-yearStart)/86400000)+1)/7),year:tmp.getUTCFullYear()};
+}
+
+// ═══════════════════════════════════════
+// PÉRIODES — 21 au 20 + possibilité d'en ajouter
+// ═══════════════════════════════════════
+function buildBasePeriods(){
+  const now=new Date();
+  const baseYear=now.getFullYear()-1;
+  const periods=[];
+  for(let i=0;i<24;i++){
+    const totalMo=baseYear*12+i;
+    const yr=Math.floor(totalMo/12),mo=totalMo%12;
+    const start=new Date(yr,mo,21);
+    const endMo=mo===11?0:mo+1,endYr=mo===11?yr+1:yr;
+    const end=new Date(endYr,endMo,20);
+    const{week:wS,year:wyS}=isoWeekNum(start);
+    const{week:wE,year:wyE}=isoWeekNum(end);
+    const wLabel=wS===wE?`S${wS} ${wyS}`:`S${wS}–S${wE} ${wyS!==wyE?wyE:wyS}`;
+    periods.push({start,end,label:`${MOIS[endMo]} ${endYr}`,wLabel});
+  }
+  return periods;
+}
+
+let BASE_PERIODS=buildBasePeriods();
+let PERIODS=[...BASE_PERIODS];
+
+function rebuildPeriods(){
+  BASE_PERIODS=buildBasePeriods();
+  PERIODS=[...BASE_PERIODS];
+  // Ajouter les périodes extra
+  (ST.extraPeriods||[]).forEach(ep=>{
+    addExtraPeriodRaw(new Date(ep.start),new Date(ep.end));
+  });
+}
+
+function addExtraPeriodRaw(start,end){
+  const endMo=end.getMonth(),endYr=end.getFullYear();
+  const{week:wS,year:wyS}=isoWeekNum(start);
+  const{week:wE,year:wyE}=isoWeekNum(end);
+  const wLabel=wS===wE?`S${wS} ${wyS}`:`S${wS}–S${wE} ${wyE}`;
+  PERIODS.push({start,end,label:`${MOIS[endMo]} ${endYr}`,wLabel,extra:true});
+}
+
+function addNextPeriod(){
+  const last=PERIODS[PERIODS.length-1];
+  const newStart=addDays(last.end,1);
+  const newEnd=new Date(newStart);
+  newEnd.setMonth(newEnd.getMonth()+1);
+  // Stocker
+  if(!ST.extraPeriods)ST.extraPeriods=[];
+  ST.extraPeriods.push({start:isoStr(newStart),end:isoStr(newEnd)});
+  addExtraPeriodRaw(newStart,newEnd);
+  save();
+  renderTabs();
+}
+
+function currentPeriodIdx(){
+  const now=new Date();
+  for(let i=0;i<PERIODS.length;i++)if(now>=PERIODS[i].start&&now<=PERIODS[i].end)return i;
+  return Math.floor(PERIODS.length/2);
+}
+
+// ═══════════════════════════════════════
+// SEMAINES
+// ═══════════════════════════════════════
+function buildWeeks(period){
+  const{start,end}=period;
+  const dow=start.getDay(),toMon=dow===0?-6:1-dow;
+  let wMon=new Date(start);wMon.setDate(wMon.getDate()+toMon);
+  const weeks=[];
+  while(wMon<=end){
+    const wSun=addDays(wMon,6);
+    const days=[];
+    for(let d=0;d<7;d++){const day=addDays(wMon,d);if(day>=start&&day<=end)days.push(day);}
+    if(days.length)weeks.push({wMon:new Date(wMon),wSun,days});
+    wMon=addDays(wMon,7);
+  }
+  return weeks;
+}
+
+// Trouver le periodIdx et weekIdx pour une date ISO
+function findPeriodForDate(dk){
+  for(let pi=0;pi<PERIODS.length;pi++){
+    const p=PERIODS[pi];
+    const weeks=buildWeeks(p);
+    for(let wi=0;wi<weeks.length;wi++){
+      if(weeks[wi].days.some(d=>isoStr(d)===dk))return{pi,wi};
+    }
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════
+// CALCUL MAJORATIONS
+// ═══════════════════════════════════════
+function parseTime(str){
+  if(!str)return null;
+  const[h,m]=str.split(':').map(Number);
+  if(isNaN(h)||isNaN(m))return null;
+  return h+m/60;
+}
+// Date de bascule vers les nouvelles règles de majoration (paie de juin)
+const NOUVELLES_REGLES_DATE = new Date(2026, 5, 1); // 1er juin 2026
+
+function calcPremiums(calDate,startH,endH){
+  const startMin=Math.round(startH*60),endMin=Math.round(endH*60);
+  const useNewRules = calDate >= NOUVELLES_REGLES_DATE;
+
+  if(!useNewRules){
+    // ── Ancien calcul (avant juin 2026), inchangé ──
+    let nightMin=0,dimFerieMin=0;
+    for(let m=startMin;m<endMin;m++){
+      const minOfDay=m%1440;
+      if(minOfDay>=21*60||minOfDay<6*60)nightMin++;
+      const thisDay=addDays(calDate,Math.floor(m/1440));
+      if(thisDay.getDay()===0||isFerie(isoStr(thisDay)))dimFerieMin++;
+    }
+    return{totalH:(endMin-startMin)/60,nightH:nightMin/60,dimFerieH:dimFerieMin/60,satMin:0,satNightMin:0,sunNightMin:0};
+  }
+
+  // ── Nouvelles règles (à partir de juin 2026) ──
+  // - Lun-Ven nuit (21h-6h) : +50% (nightMin)
+  // - Samedi jour (6h-21h) : +25% (satMin)
+  // - Samedi 21h → Dimanche 6h : +75% (satNightMin)
+  // - Dimanche jour (6h-21h) : +100% (dimFerieMin)
+  // - Dimanche 21h → Lundi 6h : +100% (sunNightMin)
+  // - Jour férié en semaine : +100% (dimFerieMin)
+  let nightMin=0,dimFerieMin=0,satMin=0,satNightMin=0,sunNightMin=0;
+  for(let m=startMin;m<endMin;m++){
+    const minOfDay=m%1440;
+    const isNightSlot = minOfDay>=21*60||minOfDay<6*60;
+    const thisDay=addDays(calDate,Math.floor(m/1440));
+    const dow=thisDay.getDay(); // 0=dimanche,6=samedi
+    const ferie=isFerie(isoStr(thisDay));
+
+    if(isNightSlot){
+      // Nuit : déterminer de quelle nuit il s'agit selon l'heure
+      if(minOfDay>=21*60){
+        // 21h-24h du jour "thisDay" : nuit thisDay → thisDay+1
+        if(dow===6) satNightMin++;       // samedi soir → dimanche
+        else if(dow===0) sunNightMin++;  // dimanche soir → lundi
+        else nightMin++;                 // nuit normale
+      } else {
+        // 0h-6h du jour "thisDay" : fin de la nuit de (thisDay-1) → thisDay
+        if(dow===0) satNightMin++;       // 0h-6h dimanche = fin nuit samedi→dimanche
+        else if(dow===1) sunNightMin++;  // 0h-6h lundi = fin nuit dimanche→lundi
+        else nightMin++;
+      }
+    } else {
+      // Hors créneau nuit (6h-21h)
+      if(dow===6) satMin++;              // samedi jour +25%
+      else if(dow===0) dimFerieMin++;     // dimanche jour +100%
+      else if(ferie) dimFerieMin++;       // férié en semaine +100%
+    }
+  }
+  return{
+    totalH:(endMin-startMin)/60,
+    nightH:nightMin/60,
+    dimFerieH:dimFerieMin/60,
+    satMin,satNightMin,sunNightMin
+  };
+}
+function tauxH(brut){return brut/151.67}
+function calcWeekHours(week,dayData,disabled){
+  let h=0;
+  week.days.forEach(day=>{
+    const dk=isoStr(day);if(disabled[dk])return;
+    const d=dayData[dk]||{};
+    const s=parseTime(d.start),e=parseTime(d.end);
+    if(s===null||e===null)return;
+    h+=(e<=s?e+24:e)-s;
+  });
+  return h;
+}
+
+// ═══════════════════════════════════════
+// CALCUL PAIE
+// ═══════════════════════════════════════
+function calcMonthPay(dayData,weekEndChoices,disabled,periodIdx,salaireBrut,tauxNet){
+  const period=PERIODS[periodIdx];
+  const weeks=buildWeeks(period);
+  const tx=tauxH(salaireBrut);
+  const coef=tauxNet/100;
+  let brutMaj=0,brutPoly=0,netPrimes=0;
+  let detail={nightH:0,dimFerieH:0,h125:0,h150:0,satH:0,satNightH:0,sunNightH:0};
+  weeks.forEach((week,wi)=>{
+    let wTot=0,wNight=0,wDimFerie=0,wSat=0,wSatNight=0,wSunNight=0;
+    week.days.forEach(day=>{
+      const dk=isoStr(day);if(disabled[dk])return;
+      const d=dayData[dk]||{};
+      const s=parseTime(d.start),e=parseTime(d.end);
+      if(s===null||e===null)return;
+      const ea=e<=s?e+24:e;
+      const{totalH,nightH,dimFerieH,satMin,satNightMin,sunNightMin}=calcPremiums(day,s,ea);
+      wTot+=totalH;wNight+=nightH;wDimFerie+=dimFerieH;
+      wSat+=(satMin||0)/60;wSatNight+=(satNightMin||0)/60;wSunNight+=(sunNightMin||0)/60;
+      detail.nightH+=nightH;detail.dimFerieH+=dimFerieH;
+      detail.satH+=(satMin||0)/60;detail.satNightH+=(satNightMin||0)/60;detail.sunNightH+=(sunNightMin||0)/60;
+      if(d.igd==='igd1')netPrimes+=92;
+      if(d.igd==='igd2')netPrimes+=41;
+      if(d.poly)brutPoly+=4;
+    });
+    let h125=0,h150=0;
+    if(wTot>43){h125=3;h150=wTot-43;}
+    else if(wTot>40){h125=wTot-40;}
+    detail.h125+=h125;detail.h150+=h150;
+    brutMaj+=h125*tx*0.25+h150*tx*0.50+wNight*tx*0.50+wDimFerie*tx*1.00
+            +wSat*tx*0.25+wSatNight*tx*0.75+wSunNight*tx*1.00;
+    const ch=weekEndChoices[`${periodIdx}-${wi}`];
+    const vm={pe1:35,pe2:60,pe3:90,vp1:90,vp2:125,vp3:200};
+    if(ch&&vm[ch])netPrimes+=vm[ch];
+  });
+  const brutTotal=salaireBrut+brutMaj+brutPoly;
+  const netBase=brutTotal*coef;
+  const netTotal=netBase+netPrimes;
+  return{
+    brutTotal:Math.round(brutTotal*100)/100,
+    netBase:Math.round(netBase*100)/100,
+    netPrimes:Math.round(netPrimes*100)/100,
+    netTotal:Math.round(netTotal*100)/100,
+    brutMaj:Math.round(brutMaj*100)/100,
+    detail
+  };
+}
+
+// Calcul paie sur une plage de dates libre
+function calcPayForRange(fromIso, toIso){
+  const from=new Date(fromIso),to=new Date(toIso);
+  const tx=tauxH(ST.salaire);
+  const coef=ST.tauxNet/100;
+  let brutMaj=0,brutPoly=0,netPrimes=0;
+  let totalWorkedH=0,detail={nightH:0,dimFerieH:0,h125:0,h150:0,satH:0,satNightH:0,sunNightH:0};
+  let daysWorked=0;
+
+  // On parcourt toutes les périodes
+  PERIODS.forEach((period,pi)=>{
+    const weeks=buildWeeks(period);
+    weeks.forEach((week,wi)=>{
+      // Check si semaine dans la plage
+      const weekFrom=week.days[0],weekTo=week.days[week.days.length-1];
+      if(weekTo<from||weekFrom>to)return;
+      let wTot=0,wNight=0,wDimFerie=0,wSat=0,wSatNight=0,wSunNight=0;
+      week.days.forEach(day=>{
+        if(day<from||day>to)return;
+        const dk=isoStr(day);
+        if(ST.disabled[dk])return;
+        const d=ST.dayData[dk]||{};
+        const s=parseTime(d.start),e=parseTime(d.end);
+        if(s===null||e===null)return;
+        const ea=e<=s?e+24:e;
+        const{totalH,nightH,dimFerieH,satMin,satNightMin,sunNightMin}=calcPremiums(day,s,ea);
+        wTot+=totalH;wNight+=nightH;wDimFerie+=dimFerieH;
+        wSat+=(satMin||0)/60;wSatNight+=(satNightMin||0)/60;wSunNight+=(sunNightMin||0)/60;
+        totalWorkedH+=totalH;daysWorked++;
+        detail.nightH+=nightH;detail.dimFerieH+=dimFerieH;
+        detail.satH+=(satMin||0)/60;detail.satNightH+=(satNightMin||0)/60;detail.sunNightH+=(sunNightMin||0)/60;
+        if(d.igd==='igd1')netPrimes+=92;
+        if(d.igd==='igd2')netPrimes+=41;
+        if(d.poly)brutPoly+=4;
+      });
+      let h125=0,h150=0;
+      if(wTot>43){h125=3;h150=wTot-43;}
+      else if(wTot>40){h125=wTot-40;}
+      detail.h125+=h125;detail.h150+=h150;
+      brutMaj+=h125*tx*0.25+h150*tx*0.50+wNight*tx*0.50+wDimFerie*tx*1.00
+              +wSat*tx*0.25+wSatNight*tx*0.75+wSunNight*tx*1.00;
+      const ch=ST.weekEndChoices[`${pi}-${wi}`];
+      const vm={pe1:35,pe2:60,pe3:90,vp1:90,vp2:125,vp3:200};
+      if(ch&&vm[ch])netPrimes+=vm[ch];
+    });
+  });
+  const brutTotal=ST.salaire+brutMaj+brutPoly;
+  const netBase=brutTotal*coef;
+  const netTotal=netBase+netPrimes;
+  return{
+    brutTotal:Math.round(brutTotal*100)/100,
+    netBase:Math.round(netBase*100)/100,
+    netPrimes:Math.round(netPrimes*100)/100,
+    netTotal:Math.round(netTotal*100)/100,
+    brutMaj:Math.round(brutMaj*100)/100,
+    totalWorkedH:Math.round(totalWorkedH*10)/10,
+    daysWorked,
+    detail
+  };
+}
+
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+let ST={salaire:1850,tauxNet:75.8,periodIdx:null,dayData:{},weekEndChoices:{},disabled:{},extraPeriods:[]};
+
+function initApp(saved){
+  ST={
+    salaire: saved.salaire||1850,
+    tauxNet: saved.tauxNet||75.8,
+    periodIdx: null,
+    dayData: saved.dayData||{},
+    weekEndChoices: saved.weekEndChoices||{},
+    disabled: saved.disabled||{},
+    extraPeriods: saved.extraPeriods||[]
+  };
+  rebuildPeriods();
+  ST.periodIdx = saved.periodIdx!=null ? saved.periodIdx : currentPeriodIdx();
+  document.getElementById('salaryInput').value=ST.salaire;
+  document.getElementById('tauxNetInput').value=ST.tauxNet;
+  renderTabs();
+  renderPage();
+  initStatsSelectors();
+  renderCalendar();
+}
+
+function save(){scheduleSave();}
+
+// ═══════════════════════════════════════
+// FORMAT
+// ═══════════════════════════════════════
+function fmt2(n){return n.toFixed(2)}
+function fmtH(h){const hh=Math.floor(h),mm=Math.round((h-hh)*60);return mm>0?`${hh}h${p2(mm)}`:`${hh}h`}
+function fmtDate(d){return `${p2(d.getDate())}/${p2(d.getMonth()+1)}/${d.getFullYear()}`}
+function fmtS(d){return `${p2(d.getDate())}/${p2(d.getMonth()+1)}`}
+
+// ═══════════════════════════════════════
+// NAVIGATION VUES
+// ═══════════════════════════════════════
+let currentView='suivi';
+function switchView(v){
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(el=>el.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.getElementById('nav-'+v).classList.add('active');
+  currentView=v;
+  if(v==='cal')renderCalendar();
+  if(v==='stats')renderStats();
+}
+
+// ═══════════════════════════════════════
+// RENDER TABS (périodes)
+// ═══════════════════════════════════════
+function renderTabs(){
+  const el=document.getElementById('tabsEl');
+  el.innerHTML=PERIODS.map((p,i)=>{
+    const{week:wS,year:wyS}=isoWeekNum(p.start);
+    const{week:wE,year:wyE}=isoWeekNum(p.end);
+    const semLabel=wS===wE?`S${wS}`:`S${wS}–S${wE}`;
+    return `<button class="tab${i===ST.periodIdx?' active':''}" data-i="${i}" title="${semLabel} · ${p.label}">
+      <span style="display:block;font-size:9px;color:var(--accent);opacity:.8">${semLabel}</span>
+      <span>${p.label}</span>
+    </button>`;
+  }).join('')
+  + `<button class="tab-add" onclick="addNextPeriod()" title="Ajouter la période suivante">＋</button>`;
+  el.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>{
+    ST.periodIdx=+btn.dataset.i;save();renderTabs();renderPage();
+  }));
+  const a=el.querySelector('.tab.active');if(a)a.scrollIntoView({block:'nearest',inline:'center'});
+}
+
+// ═══════════════════════════════════════
+// RENDER PAGE (suivi)
+// ═══════════════════════════════════════
+function renderPage(){
+  const period=PERIODS[ST.periodIdx];
+  const weeks=buildWeeks(period);
+  document.getElementById('periodBar').innerHTML=`Période&nbsp;: <strong>${fmtDate(period.start)}</strong> → <strong>${fmtDate(period.end)}</strong>`;
+  const pay=calcMonthPay(ST.dayData,ST.weekEndChoices,ST.disabled,ST.periodIdx,ST.salaire,ST.tauxNet);
+  const{brutTotal,netBase,netPrimes,netTotal,brutMaj,detail}=pay;
+  const detParts=[];
+  if(detail.nightH>0)detParts.push(`${fmtH(detail.nightH)} nuit`);
+  if(detail.satH>0)detParts.push(`${fmtH(detail.satH)} sam. +25%`);
+  if(detail.satNightH>0)detParts.push(`${fmtH(detail.satNightH)} nuit sam. +75%`);
+  if(detail.dimFerieH>0)detParts.push(`${fmtH(detail.dimFerieH)} dim/fér.`);
+  if(detail.sunNightH>0)detParts.push(`${fmtH(detail.sunNightH)} nuit dim. x2`);
+  if(detail.h125>0)detParts.push(`${fmtH(detail.h125)} sup.125%`);
+  if(detail.h150>0)detParts.push(`${fmtH(detail.h150)} sup.150%`);
+  const detStr=detParts.length?detParts.join(' · '):'—';
+
+  let html=`
+  <div class="print-header">
+    <h2>Récapitulatif — ${period.label}</h2>
+    <p>Période : ${fmtDate(period.start)} → ${fmtDate(period.end)} · Brut : ${ST.salaire}€ · Taux net : ${ST.tauxNet}%</p>
+  </div>
+  <div class="summary">
+    <div class="sum-grid">
+      <div class="sum-box"><div class="sum-lbl">Brut total</div><div class="sum-val prem" id="s-brut">${fmt2(brutTotal)} €</div></div>
+      <div class="sum-box"><div class="sum-lbl">Net estimé</div><div class="sum-val net" id="s-net">${fmt2(netBase)} €</div></div>
+      <div class="sum-box"><div class="sum-lbl">Net + primes</div><div class="sum-val tot" id="s-tot">${fmt2(netTotal)} €</div></div>
+    </div>
+    <div class="sum-detail" id="s-detail">
+      Majorations brutes <span id="sd-maj">${fmt2(brutMaj)}€</span> · Primes nettes <span id="sd-primes">${fmt2(netPrimes)}€</span><br>
+      Heures : <span>${detStr}</span>
+    </div>
+    <div class="sum-note">Formule : (brut total × ${ST.tauxNet}%) + primes nettes</div>
+  </div>
+  <div class="export-wrap"><button class="export-btn" onclick="window.print()">⬇ Télécharger / Imprimer le récapitulatif</button></div>`;
+
+  weeks.forEach((week,wi)=>{
+    const wKey=`${ST.periodIdx}-${wi}`;
+    const choice=ST.weekEndChoices[wKey]||null;
+    const wH=calcWeekHours(week,ST.dayData,ST.disabled);
+    let modH=0,sup125=0,sup150=0;
+    if(wH>43){modH=4;sup125=3;sup150=wH-43;}
+    else if(wH>40){modH=4;sup125=wH-40;}
+    else if(wH>35){modH=wH-35;}
+    const{week:wNum,year:wYear}=isoWeekNum(week.wMon);
+    const semLabel=`S${wNum} ${wYear}`;
+
+    html+=`<div class="week-block">
+    <div class="week-hdr">
+      <span class="week-title">${semLabel} · ${fmtS(week.wMon)} – ${fmtS(week.wSun)}</span>
+      <span class="week-htotal" id="wh-${wKey}">${fmtH(wH)}</span>
+    </div>`;
+
+    week.days.forEach(day=>{
+      const dk=isoStr(day);
+      const dow=day.getDay(),hol=isFerie(dk),sun=dow===0,sat=dow===6;
+      const dis=!!ST.disabled[dk];
+      const d=ST.dayData[dk]||{};
+      let ncls='day-name';
+      if(hol)ncls+=' hol';else if(sun)ncls+=' sun';else if(sat)ncls+=' sat';
+      const badge=hol?'<span class="badge badge-hol">Férié</span>':'';
+      let resText='';
+      if(!dis){
+        const s=parseTime(d.start),e=parseTime(d.end);
+        if(s!==null&&e!==null){
+          const ea=e<=s?e+24:e;
+          const{totalH,nightH,dimFerieH,satMin,satNightMin,sunNightMin}=calcPremiums(day,s,ea);
+          const parts=[];
+          if(totalH>0)parts.push(`${fmtH(totalH)} travaillées`);
+          if(nightH>0)parts.push(`${fmtH(nightH)} nuit +50%`);
+          if(satMin>0)parts.push(`${fmtH(satMin/60)} sam. +25%`);
+          if(satNightMin>0)parts.push(`${fmtH(satNightMin/60)} nuit sam. +75%`);
+          if(dimFerieH>0)parts.push(`${fmtH(dimFerieH)} dim/fériés +100%`);
+          if(sunNightMin>0)parts.push(`${fmtH(sunNightMin/60)} nuit dim. +100%`);
+          resText=parts.join(' · ');
+        }
+      }
+      html+=`<div class="day-row${dis?' disabled':''}" id="row-${dk}">
+        <div class="day-top">
+          <div class="${ncls}">${JOURS[dow]} ${p2(day.getDate())}/${p2(day.getMonth()+1)} ${badge}</div>
+          <button class="day-toggle${dis?' off':''}" data-dk="${dk}"></button>
+        </div>
+        <div class="day-body" id="body-${dk}" style="${dis?'display:none':''}">
+          <div class="inputs-row">
+            <div class="t-group"><span class="t-lbl">Début</span><input type="time" class="t-input" data-dk="${dk}" data-f="start" value="${d.start||''}"></div>
+            <div class="t-group"><span class="t-lbl">Fin</span><input type="time" class="t-input" data-dk="${dk}" data-f="end" value="${d.end||''}"></div>
+          </div>
+          <div class="opts-row">
+            <button class="igd-btn${d.igd==='igd1'?' sel':''}" data-dk="${dk}" data-igd="igd1">IGD1 92€</button>
+            <button class="igd-btn${d.igd==='igd2'?' sel':''}" data-dk="${dk}" data-igd="igd2">IGD2 41€</button>
+            <label class="poly-wrap"><input type="checkbox" data-dk="${dk}" data-f="poly"${d.poly?' checked':''}> Polycompétence +4€</label>
+          </div>
+          <div class="chantier-row"><span class="chantier-lbl">🏗 Chantier</span><input type="text" class="chantier-input" data-dk="${dk}" data-f="chantier" placeholder="Nom du chantier…" value="${d.chantier||''}"></div>
+          <div class="day-result" id="dr-${dk}">${resText}</div>
+        </div>
+      </div>`;
+    });
+
+    html+=`<div class="mod-bar" id="mb-${wKey}">
+      <div class="mod-item"><div class="mod-num ${modH>0?'warn':'zero'}">${fmtH(modH)}</div><div class="mod-lbl">Modulation</div></div>
+      <div class="mod-item"><div class="mod-num ${sup125>0?'pos':'zero'}">${fmtH(sup125)}</div><div class="mod-lbl">Sup. 125%</div></div>
+      <div class="mod-item"><div class="mod-num ${sup150>0?'pos':'zero'}">${fmtH(sup150)}</div><div class="mod-lbl">Sup. 150%</div></div>
+    </div>`;
+
+    const PE=[['pe1','PE1 35€'],['pe2','PE2 60€'],['pe3','PE3 90€']];
+    const VP=[['vp1','VP1 90€'],['vp2','VP2 125€'],['vp3','VP3 200€']];
+    html+=`<div class="week-end">
+      <div class="we-lbl">Indemnité fin de semaine :</div>
+      <div class="we-groups">
+        <div class="we-group">${PE.map(([k,l])=>`<button class="we-btn${choice===k?' sel-pe':''}" data-wk="${wKey}" data-c="${k}">${l}</button>`).join('')}</div>
+        <div class="we-group">${VP.map(([k,l])=>`<button class="we-btn${choice===k?' sel-vp':''}" data-wk="${wKey}" data-c="${k}">${l}</button>`).join('')}</div>
+      </div>
+    </div></div>`;
+  });
+
+  document.getElementById('root').innerHTML=html;
+  bindEvents();
+}
+
+// ═══════════════════════════════════════
+// EVENTS
+// ═══════════════════════════════════════
+function bindEvents(){
+  document.querySelectorAll('.t-input').forEach(inp=>inp.addEventListener('change',e=>{
+    const dk=e.target.dataset.dk,f=e.target.dataset.f;
+    if(!ST.dayData[dk])ST.dayData[dk]={};
+    ST.dayData[dk][f]=e.target.value;
+    save();updateDayResult(dk);updateWeekFromDay(dk);updateSummaryBar();
+  }));
+  document.querySelectorAll('.igd-btn').forEach(btn=>btn.addEventListener('click',e=>{
+    const dk=e.target.dataset.dk,igd=e.target.dataset.igd;
+    if(!ST.dayData[dk])ST.dayData[dk]={};
+    ST.dayData[dk].igd=ST.dayData[dk].igd===igd?null:igd;
+    save();
+    document.querySelectorAll(`.igd-btn[data-dk="${dk}"]`).forEach(b=>b.classList.toggle('sel',b.dataset.igd===ST.dayData[dk].igd));
+    updateSummaryBar();
+  }));
+  document.querySelectorAll('[data-f="poly"]').forEach(cb=>cb.addEventListener('change',e=>{
+    const dk=e.target.dataset.dk;
+    if(!ST.dayData[dk])ST.dayData[dk]={};
+    ST.dayData[dk].poly=e.target.checked;
+    save();updateSummaryBar();
+  }));
+  document.querySelectorAll('.we-btn').forEach(btn=>btn.addEventListener('click',e=>{
+    const wk=e.target.dataset.wk,c=e.target.dataset.c;
+    ST.weekEndChoices[wk]=ST.weekEndChoices[wk]===c?null:c;
+    save();
+    document.querySelectorAll(`.we-btn[data-wk="${wk}"]`).forEach(b=>{
+      b.classList.remove('sel-pe','sel-vp');
+      if(b.dataset.c===ST.weekEndChoices[wk])b.classList.add(b.dataset.c.startsWith('pe')?'sel-pe':'sel-vp');
+    });
+    updateSummaryBar();
+  }));
+  document.querySelectorAll('.day-toggle').forEach(btn=>btn.addEventListener('click',e=>{
+    const dk=e.target.dataset.dk;
+    ST.disabled[dk]=!ST.disabled[dk];
+    if(!ST.disabled[dk])delete ST.disabled[dk];
+    save();
+    const dis=!!ST.disabled[dk];
+    btn.classList.toggle('off',dis);
+    document.getElementById(`row-${dk}`).classList.toggle('disabled',dis);
+    document.getElementById(`body-${dk}`).style.display=dis?'none':'';
+    updateDayResult(dk);updateWeekFromDay(dk);updateSummaryBar();
+  }));
+  document.querySelectorAll('.chantier-input').forEach(inp=>inp.addEventListener('change',e=>{
+    const dk=e.target.dataset.dk;
+    if(!ST.dayData[dk])ST.dayData[dk]={};
+    ST.dayData[dk].chantier=e.target.value;
+    save();
+  }));
+  document.getElementById('salaryInput').addEventListener('change',e=>{
+    ST.salaire=parseFloat(e.target.value)||1850;save();updateSummaryBar();
+  });
+  document.getElementById('tauxNetInput').addEventListener('change',e=>{
+    ST.tauxNet=parseFloat(e.target.value)||75.8;save();updateSummaryBar();
+  });
+}
+
+function updateDayResult(dk){
+  const el=document.getElementById(`dr-${dk}`);if(!el)return;
+  if(ST.disabled[dk]){el.textContent='';return;}
+  const d=ST.dayData[dk]||{};
+  const s=parseTime(d.start),e=parseTime(d.end);
+  if(s===null||e===null){el.textContent='';return;}
+  const ea=e<=s?e+24:e;
+  const[yr,mo,dy]=dk.split('-').map(Number);
+  const{totalH,nightH,dimFerieH,satMin,satNightMin,sunNightMin}=calcPremiums(new Date(yr,mo-1,dy),s,ea);
+  const parts=[];
+  if(totalH>0)parts.push(`${fmtH(totalH)} travaillées`);
+  if(nightH>0)parts.push(`${fmtH(nightH)} nuit +50%`);
+  if(satMin>0)parts.push(`${fmtH(satMin/60)} sam. +25%`);
+  if(satNightMin>0)parts.push(`${fmtH(satNightMin/60)} nuit sam. +75%`);
+  if(dimFerieH>0)parts.push(`${fmtH(dimFerieH)} dim/fériés +100%`);
+  if(sunNightMin>0)parts.push(`${fmtH(sunNightMin/60)} nuit dim. +100%`);
+  el.textContent=parts.join(' · ');
+}
+
+function updateWeekFromDay(dk){
+  const weeks=buildWeeks(PERIODS[ST.periodIdx]);
+  weeks.forEach((week,wi)=>{
+    if(!week.days.some(d=>isoStr(d)===dk))return;
+    const wKey=`${ST.periodIdx}-${wi}`;
+    const wH=calcWeekHours(week,ST.dayData,ST.disabled);
+    const el=document.getElementById(`wh-${wKey}`);if(el)el.textContent=fmtH(wH);
+    let modH=0,sup125=0,sup150=0;
+    if(wH>43){modH=4;sup125=3;sup150=wH-43;}
+    else if(wH>40){modH=4;sup125=wH-40;}
+    else if(wH>35){modH=wH-35;}
+    const mb=document.getElementById(`mb-${wKey}`);
+    if(mb)mb.innerHTML=`
+      <div class="mod-item"><div class="mod-num ${modH>0?'warn':'zero'}">${fmtH(modH)}</div><div class="mod-lbl">Modulation</div></div>
+      <div class="mod-item"><div class="mod-num ${sup125>0?'pos':'zero'}">${fmtH(sup125)}</div><div class="mod-lbl">Sup. 125%</div></div>
+      <div class="mod-item"><div class="mod-num ${sup150>0?'pos':'zero'}">${fmtH(sup150)}</div><div class="mod-lbl">Sup. 150%</div></div>`;
+  });
+}
+
+function updateSummaryBar(){
+  const pay=calcMonthPay(ST.dayData,ST.weekEndChoices,ST.disabled,ST.periodIdx,ST.salaire,ST.tauxNet);
+  const{brutTotal,netBase,netPrimes,netTotal,brutMaj}=pay;
+  const sb=document.getElementById('s-brut'),sn=document.getElementById('s-net'),st2=document.getElementById('s-tot');
+  const sdm=document.getElementById('sd-maj'),sdp=document.getElementById('sd-primes');
+  if(sb)sb.textContent=`${fmt2(brutTotal)} €`;
+  if(sn)sn.textContent=`${fmt2(netBase)} €`;
+  if(st2)st2.textContent=`${fmt2(netTotal)} €`;
+  if(sdm)sdm.textContent=`${fmt2(brutMaj)}€`;
+  if(sdp)sdp.textContent=`${fmt2(netPrimes)}€`;
+}
+
+// ═══════════════════════════════════════
+// CALENDRIER DYNAMIQUE
+// ═══════════════════════════════════════
+let calYear=new Date().getFullYear();
+let calMonth=new Date().getMonth();
+
+function renderCalendar(){
+  const label=`${MOIS[calMonth]} ${calYear}`;
+  document.getElementById('calMonthLabel').textContent=label;
+  const body=document.getElementById('calBody');
+  body.innerHTML='';
+  const today=isoStr(new Date());
+
+  // Premier jour du mois (lundi=0 ... dimanche=6)
+  const firstDay=new Date(calYear,calMonth,1);
+  const firstDow=firstDay.getDay()===0?6:firstDay.getDay()-1; // lundi=0
+  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+
+  // Jours du mois précédent pour compléter
+  const prevMonth=calMonth===0?11:calMonth-1;
+  const prevYear=calMonth===0?calYear-1:calYear;
+  const daysInPrev=new Date(prevYear,prevMonth+1,0).getDate();
+
+  let cells=[];
+  // Jours mois précédent
+  for(let i=firstDow-1;i>=0;i--){
+    cells.push({day:daysInPrev-i,month:prevMonth,year:prevYear,other:true});
+  }
+  // Jours du mois
+  for(let d=1;d<=daysInMonth;d++){
+    cells.push({day:d,month:calMonth,year:calYear,other:false});
+  }
+  // Compléter à 42 cases (6 semaines)
+  const nextMonth=calMonth===11?0:calMonth+1;
+  const nextYear=calMonth===11?calYear+1:calYear;
+  let nd=1;
+  while(cells.length<42){cells.push({day:nd++,month:nextMonth,year:nextYear,other:true});}
+
+  // Rendre les cellules par rangées de 7
+  let currentWeekLabel=null;
+  cells.forEach((c,idx)=>{
+    const date=new Date(c.year,c.month,c.day);
+    const dk=isoStr(date);
+    const isToday=dk===today;
+    const ferie=isFerie(dk);
+    const dow=date.getDay(); // 0=dim
+    const isSun=dow===0;
+    const isSat=dow===6;
+    const d=ST.dayData[dk]||{};
+    const hasData=!c.other&&!ST.disabled[dk]&&d.start&&d.end;
+
+    // Numéro de semaine (affiché sur le lundi)
+    const isMonday=(dow===1);
+    let weekLabelHtml='';
+    if(isMonday||idx===0){
+      const{week:wN,year:wY}=isoWeekNum(date);
+      weekLabelHtml=`<span class="cal-week-label" onclick="goToWeek('${dk}')">S${wN}</span>`;
+    }
+
+    let hours='';
+    if(hasData){
+      const s=parseTime(d.start),e=parseTime(d.end);
+      if(s!==null&&e!==null){const ea=e<=s?e+24:e;hours=fmtH(ea-s);}
+    }
+
+    let cls='cal-cell';
+    if(c.other)cls+=' other-month';
+    if(isToday)cls+=' today';
+    if(hasData)cls+=' has-data';
+    if(ferie&&!c.other)cls+=' is-ferie';
+    if(isSun&&!c.other)cls+=' is-sunday';
+
+    const dayNumStyle=isSun?'color:var(--red)':isSat?'color:var(--accent2)':'';
+    const ferieLabel=ferie&&!c.other?`<div class="cal-day-hol">Férié</div>`:'';
+
+    body.innerHTML+=`<div class="${cls}" onclick="goToDay('${dk}')">
+      ${weekLabelHtml}
+      <div class="cal-day-num" style="${dayNumStyle}">${c.day}</div>
+      ${hours?`<div class="cal-day-info"><span class="cal-day-hours">${hours}</span></div>`:''}
+      ${ferieLabel}
+    </div>`;
+  });
+}
+
+function calPrev(){
+  calMonth--;if(calMonth<0){calMonth=11;calYear--;}
+  renderCalendar();
+}
+function calNext(){
+  calMonth++;if(calMonth>11){calMonth=0;calYear++;}
+  renderCalendar();
+}
+
+// Aller à un jour dans la vue suivi
+function goToDay(dk){
+  const res=findPeriodForDate(dk);
+  if(!res){alert('Cette date n\'est pas dans une période disponible.');return;}
+  ST.periodIdx=res.pi;
+  save();
+  switchView('suivi');
+  renderTabs();
+  renderPage();
+  setTimeout(()=>{
+    const el=document.getElementById(`row-${dk}`);
+    if(el)el.scrollIntoView({behavior:'smooth',block:'center'});
+  },150);
+}
+
+// Aller à la semaine contenant un lundi
+function goToWeek(mondayDk){
+  const res=findPeriodForDate(mondayDk);
+  if(!res){alert('Cette semaine n\'est pas dans une période disponible.');return;}
+  ST.periodIdx=res.pi;
+  save();
+  switchView('suivi');
+  renderTabs();
+  renderPage();
+  setTimeout(()=>{
+    const weeks=buildWeeks(PERIODS[res.pi]);
+    const wKey=`${res.pi}-${res.wi}`;
+    // Trouver le premier jour de la semaine visible
+    const firstDk=isoStr(weeks[res.wi].days[0]);
+    const el=document.getElementById(`row-${firstDk}`);
+    if(el)el.scrollIntoView({behavior:'smooth',block:'start'});
+  },150);
+}
+
+// ═══════════════════════════════════════
+// STATISTIQUES
+// ═══════════════════════════════════════
+let statsMode='mois';
+let statsCharts={};
+
+function setStatsMode(mode){
+  statsMode=mode;
+  document.querySelectorAll('.stats-mode-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sm-'+mode).classList.add('active');
+  document.getElementById('stats-sel-mois').style.display=mode==='mois'?'flex':'none';
+  document.getElementById('stats-sel-annee').style.display=mode==='annee'?'flex':'none';
+  document.getElementById('stats-sel-custom').style.display=mode==='custom'?'block':'none';
+  if(mode!=='custom')renderStats();
+}
+
+function initStatsSelectors(){
+  // Mois : liste des périodes disponibles
+  const mSel=document.getElementById('statsMonthSel');
+  mSel.innerHTML=PERIODS.map((p,i)=>`<option value="${i}">${p.label}</option>`).join('');
+  mSel.value=ST.periodIdx;
+
+  // Années civiles
+  const years=new Set();
+  PERIODS.forEach(p=>{
+    years.add(p.start.getFullYear());
+    years.add(p.end.getFullYear());
+  });
+  const ySel=document.getElementById('statsYearSel');
+  ySel.innerHTML=[...years].sort((a,b)=>b-a).map(y=>`<option value="${y}">${y}</option>`).join('');
+  ySel.value=new Date().getFullYear();
+
+  // Dates par défaut custom
+  const now=new Date();
+  document.getElementById('statsDateFrom').value=`${now.getFullYear()}-01-01`;
+  document.getElementById('statsDateTo').value=isoStr(now);
+}
+
+function renderStats(){
+  // Nettoyer les charts précédents
+  Object.values(statsCharts).forEach(c=>{try{c.destroy();}catch(e){}});
+  statsCharts={};
+
+  let pay, label, fromIso, toIso;
+
+  if(statsMode==='mois'){
+    const pi=parseInt(document.getElementById('statsMonthSel').value);
+    const p=PERIODS[pi];
+    fromIso=isoStr(p.start); toIso=isoStr(p.end);
+    label=p.label;
+    pay=calcPayForRange(fromIso,toIso);
+    renderStatsContent(pay,label,fromIso,toIso,'mois',pi);
+  } else if(statsMode==='annee'){
+    const yr=parseInt(document.getElementById('statsYearSel').value);
+    fromIso=`${yr}-01-01`; toIso=`${yr}-12-31`;
+    label=`Année ${yr}`;
+    pay=calcPayForRange(fromIso,toIso);
+    renderStatsContent(pay,label,fromIso,toIso,'annee',yr);
+  } else {
+    fromIso=document.getElementById('statsDateFrom').value;
+    toIso=document.getElementById('statsDateTo').value;
+    if(!fromIso||!toIso){document.getElementById('statsContent').innerHTML='<div class="stats-empty">Sélectionne une période</div>';return;}
+    label=`${fromIso} → ${toIso}`;
+    pay=calcPayForRange(fromIso,toIso);
+    renderStatsContent(pay,label,fromIso,toIso,'custom',null);
+  }
+}
+
+function renderStatsContent(pay,label,fromIso,toIso,mode,modeVal){
+  const{brutTotal,netBase,netPrimes,netTotal,brutMaj,totalWorkedH,daysWorked,detail}=pay;
+  let html=`<div class="stats-period-label">📅 ${label}</div>`;
+
+  // KPI
+  html+=`<div class="stats-kpi-grid">
+    <div class="stats-kpi"><div class="stats-kpi-val" style="color:var(--green)">${fmt2(netTotal)} €</div><div class="stats-kpi-lbl">Net + primes estimé</div></div>
+    <div class="stats-kpi"><div class="stats-kpi-val" style="color:var(--accent2)">${fmt2(brutTotal)} €</div><div class="stats-kpi-lbl">Brut total</div></div>
+    <div class="stats-kpi"><div class="stats-kpi-val" style="color:var(--accent)">${fmtH(totalWorkedH)}</div><div class="stats-kpi-lbl">Heures travaillées</div></div>
+    <div class="stats-kpi"><div class="stats-kpi-val" style="color:var(--purple)">${daysWorked} j</div><div class="stats-kpi-lbl">Jours travaillés</div></div>
+  </div>`;
+
+  // Graphique répartition du salaire
+  html+=`<div class="stats-card">
+    <div class="stats-card-title">Répartition du brut</div>
+    <div class="chart-container"><canvas id="chartPie"></canvas></div>
+  </div>`;
+
+  // Graphique heures par type
+  html+=`<div class="stats-card">
+    <div class="stats-card-title">Heures majorées</div>
+    <div class="chart-container"><canvas id="chartHours"></canvas></div>
+  </div>`;
+
+  // Si mode annee ou mois → graphique par mois
+  if(mode==='annee'||mode==='custom'){
+    html+=`<div class="stats-card">
+      <div class="stats-card-title">Évolution mensuelle (net + primes)</div>
+      <div class="chart-container"><canvas id="chartLine"></canvas></div>
+    </div>`;
+  }
+
+  // Si mode annee → graphique semaines
+  if(mode==='mois'){
+    html+=`<div class="stats-card">
+      <div class="stats-card-title">Heures par semaine</div>
+      <div class="chart-container"><canvas id="chartWeeks"></canvas></div>
+    </div>`;
+  }
+
+  document.getElementById('statsContent').innerHTML=html;
+
+  const chartDefaults={
+    color:'rgba(228,232,245,0.85)',
+    borderColor:'rgba(42,47,74,0.5)'
+  };
+  Chart.defaults.color=chartDefaults.color;
+
+  // Pie répartition brut
+  const brutBase=ST.salaire;
+  const brutPolyEstim=brutTotal-brutBase-brutMaj;
+  statsCharts.pie=new Chart(document.getElementById('chartPie'),{
+    type:'doughnut',
+    data:{
+      labels:['Salaire base','Majorations','Polycompétence'],
+      datasets:[{
+        data:[brutBase,Math.max(0,brutMaj),Math.max(0,brutPolyEstim)],
+        backgroundColor:['rgba(91,143,249,.8)','rgba(247,184,79,.8)','rgba(192,132,252,.8)'],
+        borderColor:'var(--card)',borderWidth:2
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:10}}}
+    }
+  });
+
+  // Heures majorées
+  const hoursLabels=['Normales','Nuit (+50%)','Sam. (+25%)','Nuit sam. (+75%)','Dim/Fériés (+100%)','Nuit dim. (+100%)','Sup 125%','Sup 150%'];
+  const hoursData=[
+    Math.max(0,totalWorkedH-detail.nightH-detail.dimFerieH-detail.h125-detail.h150-(detail.satH||0)-(detail.satNightH||0)-(detail.sunNightH||0)),
+    detail.nightH,detail.satH||0,detail.satNightH||0,detail.dimFerieH,detail.sunNightH||0,detail.h125,detail.h150
+  ].map(v=>Math.round(v*10)/10);
+  statsCharts.hours=new Chart(document.getElementById('chartHours'),{
+    type:'bar',
+    data:{
+      labels:hoursLabels,
+      datasets:[{
+        data:hoursData,
+        backgroundColor:['rgba(91,143,249,.7)','rgba(62,207,142,.7)','rgba(247,184,79,.5)','rgba(62,207,142,.9)','rgba(192,132,252,.7)','rgba(192,132,252,.95)','rgba(247,184,79,.7)','rgba(240,82,82,.7)'],
+        borderRadius:6,borderSkipped:false
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        y:{grid:{color:'rgba(42,47,74,.5)'},ticks:{font:{size:10}}},
+        x:{grid:{display:false},ticks:{font:{size:9}}}
+      }
+    }
+  });
+
+  // Graphique mensuel (annee/custom)
+  if(mode==='annee'||mode==='custom'){
+    const from=new Date(fromIso),to=new Date(toIso);
+    const monthData=[];
+    const monthLabels=[];
+    // Parcourir mois par mois
+    let cur=new Date(from.getFullYear(),from.getMonth(),1);
+    while(cur<=to){
+      const mFrom=isoStr(new Date(cur.getFullYear(),cur.getMonth(),1));
+      const mTo=isoStr(new Date(cur.getFullYear(),cur.getMonth()+1,0));
+      const clampFrom=mFrom<fromIso?fromIso:mFrom;
+      const clampTo=mTo>toIso?toIso:mTo;
+      const mp=calcPayForRange(clampFrom,clampTo);
+      monthData.push(mp.netTotal);
+      monthLabels.push(MOIS_COURT[cur.getMonth()]+' '+cur.getFullYear());
+      cur.setMonth(cur.getMonth()+1);
+    }
+    statsCharts.line=new Chart(document.getElementById('chartLine'),{
+      type:'line',
+      data:{
+        labels:monthLabels,
+        datasets:[{
+          label:'Net + primes (€)',
+          data:monthData,
+          borderColor:'rgba(62,207,142,1)',
+          backgroundColor:'rgba(62,207,142,.12)',
+          fill:true,tension:.3,pointRadius:4,pointBackgroundColor:'rgba(62,207,142,1)'
+        }]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false}},
+        scales:{
+          y:{grid:{color:'rgba(42,47,74,.5)'},ticks:{font:{size:10},callback:v=>v+'€'}},
+          x:{grid:{display:false},ticks:{font:{size:9}}}
+        }
+      }
+    });
+  }
+
+  // Graphique semaines (mois)
+  if(mode==='mois'){
+    const pi=modeVal;
+    const weeks=buildWeeks(PERIODS[pi]);
+    const wLabels=weeks.map(w=>{const{week:wN}=isoWeekNum(w.wMon);return`S${wN}`;});
+    const wData=weeks.map(w=>Math.round(calcWeekHours(w,ST.dayData,ST.disabled)*10)/10);
+    statsCharts.weeks=new Chart(document.getElementById('chartWeeks'),{
+      type:'bar',
+      data:{
+        labels:wLabels,
+        datasets:[{
+          label:'Heures',
+          data:wData,
+          backgroundColor:wData.map(h=>h>43?'rgba(240,82,82,.7)':h>40?'rgba(247,184,79,.7)':'rgba(91,143,249,.7)'),
+          borderRadius:6,borderSkipped:false
+        },{
+          type:'line',
+          label:'35h ref',
+          data:wData.map(()=>35),
+          borderColor:'rgba(62,207,142,.5)',
+          borderDash:[4,4],
+          pointRadius:0,
+          borderWidth:1.5
+        }]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false}},
+        scales:{
+          y:{min:0,grid:{color:'rgba(42,47,74,.5)'},ticks:{font:{size:10}}},
+          x:{grid:{display:false},ticks:{font:{size:10}}}
+        }
+      }
+    });
+  }
+}
+
+// Touche Entrée sur les champs auth
+document.getElementById('authPass').addEventListener('keydown',e=>{if(e.key==='Enter')doAuth();});
+document.getElementById('authEmail').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('authPass').focus();});
+document.getElementById('forgotEmail').addEventListener('keydown',e=>{if(e.key==='Enter')sendForgot();});
+
+// ═══════════════════════════════════════
+// SAUVEGARDE FORCÉE À LA FERMETURE / OFFLINE
+// ═══════════════════════════════════════
+// Si l'utilisateur quitte la page (ou bascule d'app sur iPhone) alors qu'une
+// sauvegarde était encore en attente (debounce 1.5s pas écoulé), on la force
+// immédiatement pour éviter de perdre la dernière saisie.
+function flushSaveIfDirty() {
+  if (saveDirty && currentUser) {
+    clearTimeout(saveTimer);
+    // sendBeacon n'est pas utilisable avec l'API Supabase (POST JSON signé),
+    // donc on tente un appel direct ; navigateurs modernes laissent le temps
+    // à une requête fetch synchrone courte de partir avant de fermer la page.
+    saveUserData();
+  }
+}
+window.addEventListener('pagehide', flushSaveIfDirty);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushSaveIfDirty();
+});
+
+// Indicateur de connexion réseau
+window.addEventListener('offline', () => {
+  setSyncBar('err', '⚠ Hors connexion — sauvegarde en attente');
+});
+window.addEventListener('online', () => {
+  if (saveDirty) { setSyncBar('saving', 'Reconnecté, sauvegarde…'); saveUserData(); }
+  else { setSyncBar('saved', '✓ Connexion rétablie'); }
+});
+
+</script>
+</body>
+</html>
